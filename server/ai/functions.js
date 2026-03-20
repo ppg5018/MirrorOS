@@ -63,6 +63,19 @@ const functions = {
     return res.json()
   },
 
+  complete_task: async (input) => {
+    const res = await fetch(`${BASE}/api/tasks`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.text })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || `PATCH /api/tasks returned ${res.status}`)
+    }
+    return res.json()
+  },
+
   set_backlight: async (input, _io) => {
     return post('/api/backlight', {
       mode: input.mode,

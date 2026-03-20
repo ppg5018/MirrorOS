@@ -465,26 +465,26 @@ function showCompletionScreen(session) {
 function _renderCompletion(session, durationMin, streak) {
   var line = MOTIVATIONAL[Math.floor(Math.random() * MOTIVATIONAL.length)]
 
-  document.getElementById('fitness-app').innerHTML =
-    '<div class="completion-screen">' +
-      '<div class="completion-label">WORKOUT COMPLETE</div>' +
-      '<div class="completion-emoji">🏆</div>' +
-      '<div class="completion-stats">' +
-        '<div class="completion-stat"><div class="completion-stat-value calories">' +
-          Math.round(session.caloriesBurned || 0) + '</div><div class="completion-stat-label">CALORIES</div></div>' +
-        '<div class="completion-stat"><div class="completion-stat-value minutes">' +
-          durationMin + '</div><div class="completion-stat-label">MINUTES</div></div>' +
-        '<div class="completion-stat"><div class="completion-stat-value exercises">' +
-          (session.exercisesCompleted || 0) + '</div><div class="completion-stat-label">EXERCISES</div></div>' +
-      '</div>' +
-      '<div class="completion-streak">' +
-        '<div class="completion-streak-label">YOUR STREAK</div>' +
-        '<div class="completion-streak-days">' + streak + ' DAYS</div>' +
-      '</div>' +
-      '<div class="completion-motivational">' + line + '</div>' +
-      '<button class="completion-back-btn" onclick="window.location.href=\'/\'">GO BACK TO MIRROR</button>' +
-      '<div class="completion-redirect" id="completion-redirect">Returning in 12s...</div>' +
-    '</div>'
+  var overlay = document.getElementById('complete-overlay')
+  if (!overlay) return
+
+  overlay.innerHTML =
+    '<div class="completion-label">WORKOUT COMPLETE</div>' +
+    '<div class="completion-emoji">🏆</div>' +
+    '<div class="completion-stats">' +
+      '<div class="completion-stat"><div class="completion-stat-value calories">' +
+        Math.round(session.caloriesBurned || 0) + '</div><div class="completion-stat-label">CALORIES</div></div>' +
+      '<div class="completion-stat"><div class="completion-stat-value minutes">' +
+        durationMin + '</div><div class="completion-stat-label">MINUTES</div></div>' +
+      '<div class="completion-stat"><div class="completion-stat-value exercises">' +
+        (session.exercisesCompleted || 0) + '</div><div class="completion-stat-label">EXERCISES</div></div>' +
+    '</div>' +
+    '<div class="completion-streak-line">🔥 ' + streak + ' day streak</div>' +
+    '<div class="completion-motivational">' + line + '</div>' +
+    '<button class="completion-back-btn" onclick="window.location.href=\'/'+'\'">GO HOME</button>' +
+    '<div class="completion-redirect" id="completion-redirect">Returning in 12s...</div>'
+
+  overlay.style.display = 'flex'
 
   // TTS
   if (window.speechSynthesis) {

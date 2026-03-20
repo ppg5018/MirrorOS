@@ -463,9 +463,6 @@ body {
   overflow-y: auto;
   flex: 1;
 }
-#exercise-list::-webkit-scrollbar { width: 3px; }
-#exercise-list::-webkit-scrollbar-track { background: transparent; }
-#exercise-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
 .exercise-row {
   padding: 14px;
@@ -630,18 +627,8 @@ body {
 }
 
 /* ============================================
-   COMPLETION SCREEN
+   COMPLETION SCREEN (elements live directly in #complete-overlay)
    ============================================ */
-.completion-screen {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
-  background: #000;
-}
 .completion-label {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 11px;
@@ -679,23 +666,6 @@ body {
   color: rgba(255,255,255,0.25);
   font-weight: 300;
   letter-spacing: 0.5px;
-}
-.completion-streak {
-  text-align: center;
-}
-.completion-streak-label {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: #999;
-  margin-bottom: 6px;
-}
-.completion-streak-days {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 42px;
-  font-weight: 200;
-  color: #5EE8C0;
-  line-height: 1;
 }
 .completion-motivational {
   font-size: 16px;
@@ -843,10 +813,35 @@ body {
 }
 
 /* ============================================
+   COMPLETE OVERLAY (fixed, z-50, above rest overlay)
+   ============================================ */
+#complete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+
+.completion-streak-line {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: #fff;
+}
+
+/* ============================================
    POLISH — image crossfade, transitions
    ============================================ */
 #exercise-image {
   transition: opacity 0.4s ease;
+}
+#timer-display {
+  transition: color 0.5s ease;
 }
 #exercise-list {
   scrollbar-width: none;
@@ -858,4 +853,14 @@ body {
 }
 .exercise-row.current:hover {
   background: rgba(255,60,0,0.10);
+}
+#btn-pause:active,
+#btn-next-set:active,
+#btn-next-exercise:active,
+#btn-skip:active,
+.rest-skip-btn:active {
+  transform: scale(0.96);
+}
+.progress-dot {
+  transition: background 0.3s ease, transform 0.3s ease;
 }

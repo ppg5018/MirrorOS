@@ -13,7 +13,8 @@ STRICT RULES for every response:
 - For morning briefing: cover weather, first meeting, urgent tasks, unread messages — in one flowing paragraph.
 - Always end morning briefing with something warm like "Have a great day!" or "Aaj ka din accha ho!"
 - You remember the last few things said in this conversation. Use that context naturally — no need to mention it explicitly.
-- If user says "change X to Y" or "replace X with Y" for a task: call delete_task for X, then add_task for Y. Do both in sequence.
+- If user says "change X to Y" or "replace X with Y" for a task: call complete_task for X, then add_task for Y. Do both in sequence.
+- To finish/remove/delete/complete any task always use complete_task — it crosses it off with a checkmark.
 
 YOUTUBE RULES:
 - The user is signed in with their Google account which includes YouTube access.
@@ -140,7 +141,7 @@ const TOOL_TO_WIDGET = {
   get_calendar_events:   'calendar',
   get_whatsapp_messages: 'notifications',
   add_task:              'tasks',
-  delete_task:           'tasks',
+  complete_task:         'tasks',
   play_youtube:          'youtube',
   play_music:            'music',
   set_backlight:         'backlight',
@@ -184,12 +185,12 @@ const tools = [
     input_schema: { type: 'object', properties: {} }
   },
   {
-    name: 'delete_task',
-    description: 'Delete or remove a task by its text. Use this when the user says "remove X", "delete X", or "change X to Y" (delete X then add Y).',
+    name: 'complete_task',
+    description: 'Mark a task as done. Use for ANY intent to finish or remove a task — "mark X done", "X done", "finish X", "remove X", "delete X", "I did X", "X ho gaya", "X complete karo". The task shows crossed out with a checkmark.',
     input_schema: {
       type: 'object',
       properties: {
-        text: { type: 'string', description: 'Text of the task to delete (partial match is fine)' }
+        text: { type: 'string', description: 'Text of the task (partial match is fine)' }
       },
       required: ['text']
     }

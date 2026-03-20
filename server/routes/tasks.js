@@ -43,7 +43,8 @@ router.get('/', async (req, res) => {
     const listId   = lists[0].id
     const taskRes  = await tasksApi.tasks.list({
       tasklist: listId,
-      showCompleted: false,
+      showCompleted: true,
+      showDeleted: false,
       maxResults: 20
     })
 
@@ -178,6 +179,60 @@ router.delete('/', async (req, res) => {
   if (io) io.emit('tasks-updated', { tasks: localTasks })
 
   res.json({ success: true, deleted: deleted.text, mock: true })
+})
+
+// PATCH /api/tasks — mark a task as done (keeps it visible with strikethrough)
+router.patch('/', async (req, res) => {
+  const { text } = req.body
+  if (!text) return res.status(400).json({ error: 'text is required' })
+
+  const auth = getAuthClient()
+
+  if (auth) {
+    try {
+      const tasksApi = google.tasks({ version: 'v1', auth })
+      const listsRes = await tasksApi.tasklists.list({ maxResults: 1 })
+      const lists    = listsRes.data.items || []
+      if (!lists.length) throw new Error('No task list found')
+
+      const listId  = lists[0].id
+      const taskRes = await tasksApi.tasks.list({ tasklist: listId, showCompleted: false, maxResults: 20 })
+      const match   = (taskRes.data.items || []).find(t =>
+        t.title.toLowerCase().includes(text.toLowerCase())
+      )
+
+      if (!match) return res.status(404).json({ error: 'Task not found' })
+
+      await tasksApi.tasks.patch({
+        tasklist: listId, task: match.id,
+        requestBody: { status: 'completed' }
+      })
+      cache = null
+
+      const io = req.app.get('io')
+      if (io) {
+        const updated = await tasksApi.tasks.list({ tasklist: listId, showCompleted: true, showDeleted: false, maxResults: 20 })
+        const tasks = (updated.data.items || []).map(t => ({
+          id: t.id, text: t.title, done: t.status === 'completed', priority: parsePriority(t.notes)
+        }))
+        io.emit('tasks-updated', { tasks })
+      }
+
+      return res.json({ success: true, completed: match.title, source: 'google' })
+    } catch (err) {
+      console.error('[tasks] complete via Google failed:', err.message)
+    }
+  }
+
+  // Local fallback
+  const task = localTasks.find(t => t.text.toLowerCase().includes(text.toLowerCase()))
+  if (!task) return res.status(404).json({ error: 'Task not found' })
+
+  task.done = true
+  const io = req.app.get('io')
+  if (io) io.emit('tasks-updated', { tasks: localTasks })
+
+  res.json({ success: true, completed: task.text, mock: true })
 })
 
 module.exports = router
