@@ -1,0 +1,8 @@
+node_modules/
+.env
+config/wifi.conf
+config/google-token.json
+config/spotify-token.json
+*.log
+public/uploads/photos/
+public/uploads/thumbs/

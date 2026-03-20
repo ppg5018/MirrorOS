@@ -1,0 +1,26 @@
+{
+  "customer": "Customer Name",
+  "city": "Pune",
+  "timezone": "Asia/Kolkata",
+  "morning_briefing_time": "07:00",
+  "widgets": {
+    "clock": true,
+    "weather": true,
+    "calendar": true,
+    "tasks": true,
+    "notifications": true,
+    "whatsapp": true,
+    "ai_bar": true,
+    "fitness": false,
+    "face_ring": false
+  },
+  "backlight": {
+    "default_mode": "warm",
+    "music_sync": true,
+    "brightness": 80
+  },
+  "branding": {
+    "logo": null,
+    "accent_colour": "#4af0c4"
+  }
+}

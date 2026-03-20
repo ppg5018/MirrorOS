@@ -1,0 +1,36 @@
+{
+  "name": "mirroros",
+  "version": "1.0.0",
+  "description": "AI-powered smart mirror backend",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:status": "pm2 status",
+    "pm2:logs": "pm2 logs",
+    "health": "bash scripts/health-check.sh",
+    "demo": "bash scripts/demo-mode.sh",
+    "update": "bash scripts/update.sh",
+    "setup:cron": "bash scripts/setup-cron.sh",
+    "setup:pm2": "bash scripts/setup-pm2.sh",
+    "test:mic": "python3 scripts/test-mic.py",
+    "test:voice": "bash scripts/test-voice.sh",
+    "test:tts": "python3 server/voice/speak.py 'MirrorOS voice test'",
+    "setup:spotify": "node scripts/spotify-auth.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.55.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "googleapis": "^171.4.0",
+    "multer": "^2.1.1",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "open": "^11.0.0",
+    "socket.io": "^4.7.5"
+  }
+}

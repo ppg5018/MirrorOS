@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>MirrorOS</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black:    #000000;
+    --surface:  #0a0a0a;
+    --surface-2:#111111;
+    --white:    #ffffff;
+    --dim:      #888888;
+    --dimmer:   #444444;
+    --dimmest:  #222222;
+    --accent:   #4af0c4;
+    --accent-2: #4a9cf0;
+    --warn:     #f0a84a;
+    --danger:   #f04a4a;
+    --wa-green: #25d366;
+    --card:     #0f0f0f;
+    --border:   #1a1a1a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .logo { font-family: 'Space Mono', monospace; font-size: 16px; color: var(--white); }
+  .logo span { color: var(--accent); }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .status-dot.offline { background: var(--danger); box-shadow: none; }
+
+  /* Section */
+  .section { padding: 20px 20px 0; }
+  .section-title {
+    font-size: 9px; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--dimmer);
+    margin-bottom: 12px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+
+  /* AI Input */
+  .ai-input-wrap { display: flex; gap: 10px; align-items: center; }
+  .ai-input {
+    flex: 1; background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 24px; padding: 12px 16px;
+    color: var(--white); font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+  }
+  .ai-input::placeholder { color: var(--dimmer); }
+  .ai-send {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--accent); border: none;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+    color: #000; font-weight: bold;
+  }
+  .ai-response {
+    margin-top: 12px; font-size: 13px;
+    color: var(--dim); line-height: 1.6; min-height: 20px;
+  }
+
+  /* Quick commands */
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Toggle rows */
+  .toggle-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 13px; color: var(--dim); }
+  .toggle {
+    width: 44px; height: 24px; border-radius: 12px;
+    background: var(--dimmest); position: relative;
+    cursor: pointer; transition: background 0.2s;
+    border: none; outline: none; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: white; top: 3px; left: 3px;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* Backlight grid */
+  .light-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 4px;
+  }
+  .light-btn {
+    padding: 10px 6px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--dim); font-size: 10px;
+    text-align: center; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .light-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74,240,196,0.05);
+  }
+  .light-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+
+  /* Volume slider */
+  .slider-wrap { padding: 4px 0; }
+  .slider-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--dimmer); margin-bottom: 8px;
+  }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 4px; }
+
+  /* Integration status */
+  .integration-row {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .integration-row:last-child { border-bottom: none; }
+  .int-name { font-size: 13px; color: var(--dim); }
+  .int-status { font-size: 10px; padding: 3px 8px; border-radius: 10px; letter-spacing: 1px; }
+  .int-live { background: rgba(74,240,196,0.1); color: var(--accent); }
+  .int-off  { background: rgba(68,68,68,0.3); color: var(--dimmer); }
+
+  /* Announce */
+  .announce-input {
+    width: 100%; background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+    color: var(--white); font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    resize: none; outline: none; margin-bottom: 8px;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%; padding: 12px;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--white);
+    font-size: 13px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .btn:active { opacity: 0.7; transform: scale(0.98); }
+  .btn.primary {
+    background: var(--accent); color: #000;
+    border-color: var(--accent); font-weight: 500;
+  }
+  .btn + .btn { margin-top: 8px; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex; padding: 8px 0;
+  }
+  .nav-item {
+    flex: 1; text-align: center; padding: 8px 4px;
+    cursor: pointer; color: var(--dimmer);
+    font-size: 9px; letter-spacing: 1px;
+    text-transform: uppercase; transition: color 0.15s;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+
+  /* Pages */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Memory log */
+  .memory-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .mem-clear-btn {
+    font-size: 10px; padding: 4px 10px; border-radius: 6px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--dimmer); cursor: pointer; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .mem-clear-btn:active { opacity: 0.6; }
+  .mem-empty { font-size: 12px; color: var(--dimmer); text-align: center; padding: 12px 0; }
+  .mem-exchange { margin-bottom: 10px; }
+  .mem-user {
+    background: rgba(74,240,196,0.07); border: 1px solid rgba(74,240,196,0.15);
+    border-radius: 8px 8px 2px 8px; padding: 8px 10px;
+    font-size: 12px; color: var(--white); margin-bottom: 4px;
+  }
+  .mem-assistant {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 2px 8px 8px 8px; padding: 8px 10px;
+    font-size: 12px; color: var(--dim); line-height: 1.5;
+  }
+  .mem-label {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--dimmer); margin-bottom: 3px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">Mirror<span>OS</span></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:10px;color:var(--dimmer)" id="conn-label">Connecting...</span>
+    <div class="status-dot offline" id="status-dot"></div>
+  </div>
+</div>
+
+<!-- PAGE 1: AI -->
+<div class="page active" id="page-ai">
+  <div class="section" style="padding-top:20px">
+    <div class="section-title">Ask the Mirror</div>
+    <div class="card">
+      <div class="ai-input-wrap">
+        <input class="ai-input" id="ai-input" type="text"
+          placeholder="What's my schedule today..." />
+        <button class="ai-send" id="ai-send">→</button>
+      </div>
+      <div class="ai-response" id="ai-response">Type a command and press send...</div>
+    </div>
+
+    <div class="section-title" style="margin-top:16px">Memory</div>
+    <div class="card">
+      <div class="memory-header">
+        <span style="font-size:11px;color:var(--dimmer)" id="mem-depth-label">0 of 5 exchanges</span>
+        <button class="mem-clear-btn" onclick="clearMemory()">Clear Memory</button>
+      </div>
+      <div id="mem-log">
+        <div class="mem-empty" id="mem-empty">No conversation yet</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:16px">Quick Commands</div>
+    <div class="quick-grid">
+      <button class="btn" onclick="quickCmd('good morning')">Good morning briefing</button>
+      <button class="btn" onclick="quickCmd('what is the weather today')">Weather today</button>
+      <button class="btn" onclick="quickCmd('what is my schedule')">My schedule</button>
+      <button class="btn" onclick="quickCmd('do I have WhatsApp messages')">WhatsApp messages</button>
+      <button class="btn" onclick="quickCmd('what are my tasks')">My tasks</button>
+      <button class="btn" onclick="quickCmd('what is the news today')">News today</button>
+    </div>
+
+    <div class="section-title" style="margin-top:16px">▶ YouTube</div>
+    <div class="card">
+      <div class="ai-input-wrap">
+        <input class="ai-input" id="yt-search-input" type="text"
+          placeholder="Search videos on mirror..." />
+        <button class="ai-send" id="yt-search-btn" style="background:var(--danger)">▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2: Controls -->
+<div class="page" id="page-controls">
+  <div class="section" style="padding-top:20px">
+
+    <div class="section-title">Backlight</div>
+    <div class="card">
+      <div class="light-grid">
+        <div class="light-btn active" id="light-warm" onclick="setLight('warm')">
+          <span class="light-icon">🌅</span>Warm
+        </div>
+        <div class="light-btn" id="light-cool" onclick="setLight('cool')">
+          <span class="light-icon">❄️</span>Cool
+        </div>
+        <div class="light-btn" id="light-music_sync" onclick="setLight('music_sync')">
+          <span class="light-icon">🎵</span>Music
+        </div>
+        <div class="light-btn" id="light-night" onclick="setLight('night')">
+          <span class="light-icon">🌙</span>Night
+        </div>
+        <div class="light-btn" id="light-red" onclick="setLight('red')">
+          <span class="light-icon">🔴</span>Red
+        </div>
+        <div class="light-btn" id="light-focus" onclick="setLight('cool')">
+          <span class="light-icon">💡</span>Focus
+        </div>
+        <div class="light-btn" id="light-off" onclick="setLight('off')">
+          <span class="light-icon">⭕</span>Off
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Volume</div>
+    <div class="card">
+      <div class="slider-wrap">
+        <div class="slider-label">
+          <span>Speaker Volume</span>
+          <span id="vol-val">80%</span>
+        </div>
+        <input type="range" min="0" max="100" value="80" id="vol-slider"
+          oninput="document.getElementById('vol-val').textContent=this.value+'%'"
+          onchange="setVolume(this.value)">
+      </div>
+    </div>
+
+    <div class="section-title">Widget Visibility</div>
+    <div class="card">
+      <div class="toggle-row">
+        <span class="toggle-label">Clock</span>
+        <button class="toggle on" onclick="toggleWidget('clock',this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Weather</span>
+        <button class="toggle on" onclick="toggleWidget('weather',this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Calendar</span>
+        <button class="toggle on" onclick="toggleWidget('calendar',this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Tasks</span>
+        <button class="toggle on" onclick="toggleWidget('tasks',this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Notifications</span>
+        <button class="toggle on" onclick="toggleWidget('notifications',this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">AI Bar</span>
+        <button class="toggle on" onclick="toggleWidget('ai-bar',this)"></button>
+      </div>
+    </div>
+
+    <div class="section-title">♫ Spotify <span id="spotify-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#444;margin-left:5px;vertical-align:middle"></span></div>
+    <div class="card">
+      <!-- Search & play -->
+      <div class="ai-input-wrap" style="margin-bottom:10px">
+        <input class="ai-input" id="spotify-search-input" type="text"
+          placeholder="Search a song or artist..." />
+        <button class="ai-send" id="spotify-search-btn"
+          style="background:#1DB954;font-size:14px">▶</button>
+      </div>
+
+      <!-- Playback controls -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:center">
+        <button class="btn" style="flex:1;padding:10px 4px" onclick="spotifyCtrl('prev')">⏮</button>
+        <button class="btn" style="flex:1;padding:10px 4px" id="spotify-playpause-btn" onclick="toggleSpotifyPlayPause()">⏯</button>
+        <button class="btn" style="flex:1;padding:10px 4px" onclick="spotifyCtrl('next')">⏭</button>
+        <button class="btn" style="flex:1;padding:10px 4px" onclick="spotifyCtrl('shuffle', true)">🔀</button>
+      </div>
+
+      <!-- Volume -->
+      <div class="slider-wrap" style="margin-bottom:12px">
+        <div class="slider-label">
+          <span>Spotify Volume</span>
+          <span id="spotify-vol-val">75%</span>
+        </div>
+        <input type="range" min="0" max="100" value="75" id="spotify-vol-slider"
+          oninput="document.getElementById('spotify-vol-val').textContent=this.value+'%'"
+          onchange="spotifySetVolume(this.value)">
+      </div>
+
+      <!-- Now playing card -->
+      <div id="spotify-now-playing" style="
+        background:rgba(29,185,84,0.05);border:1px solid rgba(29,185,84,0.1);
+        border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;min-height:52px">
+        <div id="spotify-np-art" style="
+          width:40px;height:40px;border-radius:4px;background:rgba(29,185,84,0.1);
+          display:flex;align-items:center;justify-content:center;
+          font-size:18px;flex-shrink:0">♫</div>
+        <div style="flex:1;min-width:0">
+          <div id="spotify-np-title" style="font-size:12px;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Nothing playing</div>
+          <div id="spotify-np-artist" style="font-size:10px;color:var(--dimmer);margin-top:2px">Say "play music" to start</div>
+          <div style="margin-top:5px;height:2px;background:var(--dimmest);border-radius:2px">
+            <div id="spotify-np-bar" style="height:100%;width:0%;background:#1DB954;border-radius:2px;transition:width 1s linear"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">🖼 Slideshow Photos</div>
+    <div class="card">
+      <!-- Upload area -->
+      <label style="display:block;cursor:pointer">
+        <div id="upload-drop-zone" style="
+          border:1px dashed rgba(255,255,255,0.1);border-radius:8px;
+          padding:18px;text-align:center;background:rgba(255,255,255,0.02);
+          transition:border-color 0.2s,background 0.2s;margin-bottom:10px">
+          <div style="font-size:22px;margin-bottom:4px">🖼</div>
+          <div style="font-size:10px;color:var(--dimmer);letter-spacing:1px;text-transform:uppercase">
+            Tap to upload photos · JPG PNG WEBP
+          </div>
+        </div>
+        <input type="file" id="photoUpload" accept="image/*" multiple
+          style="display:none">
+      </label>
+
+      <!-- Progress bar -->
+      <div id="upload-progress" style="display:none;margin-bottom:8px">
+        <div style="height:2px;background:var(--dimmest);border-radius:2px;overflow:hidden">
+          <div id="upload-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width 0.3s"></div>
+        </div>
+        <div style="font-size:9px;color:var(--dimmer);margin-top:4px;text-align:center" id="upload-progress-text">Uploading...</div>
+      </div>
+
+      <!-- Count + settings -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--dimmer)" id="photo-count">0 photos</span>
+        <span style="font-size:11px;color:var(--dimmer)" id="photo-interval-label">10s per slide</span>
+      </div>
+
+      <!-- Settings row -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select id="ss-interval" style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--dim);font-size:11px;padding:6px 8px;outline:none" onchange="saveSettings()">
+          <option value="5">5s</option>
+          <option value="10" selected>10s</option>
+          <option value="30">30s</option>
+          <option value="60">1 min</option>
+        </select>
+        <select id="ss-transition" style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--dim);font-size:11px;padding:6px 8px;outline:none" onchange="saveSettings()">
+          <option value="fade" selected>Fade</option>
+          <option value="slow">Slow fade</option>
+          <option value="quick">Quick</option>
+        </select>
+        <select id="ss-order" style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--dim);font-size:11px;padding:6px 8px;outline:none" onchange="saveSettings()">
+          <option value="random" selected>Random</option>
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+        </select>
+      </div>
+
+      <!-- Photo grid -->
+      <div id="photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px"></div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1;color:var(--danger);border-color:rgba(240,74,74,0.3);font-size:12px" onclick="clearAllPhotos()">Clear All</button>
+        <button class="btn primary" style="flex:1;font-size:12px" onclick="showOnMirror()">Show on Mirror</button>
+      </div>
+    </div>
+
+    <div class="section-title">YouTube</div>
+    <div class="card" id="yt-controls-card" style="display:none">
+      <button class="btn" style="color:var(--danger);border-color:var(--danger)"
+        onclick="closeYouTube()">✕ Close Video on Mirror</button>
+    </div>
+
+    <div class="section-title">Push to Mirror</div>
+    <div class="card">
+      <textarea class="announce-input" id="announce-text" rows="3"
+        placeholder="Type a message to show on the mirror..."></textarea>
+      <button class="btn primary" onclick="pushAnnouncement()">Show on Mirror</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- PAGE 3: Status -->
+<div class="page" id="page-status">
+  <div class="section" style="padding-top:20px">
+
+    <div class="section-title">Integrations</div>
+    <div class="card">
+      <div class="integration-row">
+        <span class="int-name">Google / Gmail</span>
+        <span class="int-status int-off" id="int-google">Checking...</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Google Calendar</span>
+        <span class="int-status int-off" id="int-calendar">Checking...</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">WhatsApp</span>
+        <span class="int-status int-off" id="int-whatsapp">Checking...</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Spotify</span>
+        <span class="int-status int-off" id="int-spotify">Checking...</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Claude AI</span>
+        <span class="int-status int-off" id="int-claude">Checking...</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Weather</span>
+        <span class="int-status int-off" id="int-weather">Checking...</span>
+      </div>
+    </div>
+
+    <div class="section-title">System</div>
+    <div class="card">
+      <div class="integration-row">
+        <span class="int-name">Uptime</span>
+        <span class="int-name" id="sys-uptime">--</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Memory used</span>
+        <span class="int-name" id="sys-mem">--</span>
+      </div>
+      <div class="integration-row">
+        <span class="int-name">Node version</span>
+        <span class="int-name" id="sys-node">--</span>
+      </div>
+    </div>
+
+    <div class="section-title">Actions</div>
+    <div class="card">
+      <button class="btn" onclick="triggerBriefing()">Trigger Morning Briefing Now</button>
+      <button class="btn" onclick="refreshStatus()">Refresh Status</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="nav-item active" id="nav-ai" onclick="showPage('ai')">
+    <span class="nav-icon">◎</span>AI
+  </div>
+  <div class="nav-item" id="nav-controls" onclick="showPage('controls')">
+    <span class="nav-icon">◈</span>Controls
+  </div>
+  <div class="nav-item" id="nav-status" onclick="showPage('status')">
+    <span class="nav-icon">◉</span>Status
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io()
+
+// ── Connection
+socket.on('connect', () => {
+  document.getElementById('status-dot').classList.remove('offline')
+  document.getElementById('conn-label').textContent = 'Connected'
+  refreshStatus()
+})
+socket.on('disconnect', () => {
+  document.getElementById('status-dot').classList.add('offline')
+  document.getElementById('conn-label').textContent = 'Offline'
+})
+
+// Mirror pushes AI replies — show in companion too
+socket.on('ai-response', (data) => {
+  document.getElementById('ai-response').textContent = data.text || ''
+  // Refresh memory log when a new exchange completes
+  pollMemory()
+})
+
+// ── Page navigation
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('page-' + name).classList.add('active')
+  document.getElementById('nav-' + name).classList.add('active')
+  if (name === 'status') refreshStatus()
+}
+
+// ── AI query
+async function sendQuery(text) {
+  if (!text.trim()) return
+  document.getElementById('ai-response').textContent = 'Thinking...'
+  try {
+    const res = await fetch('/api/voice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    })
+    const data = await res.json()
+    document.getElementById('ai-response').textContent = data.reply || 'No response'
+  } catch (e) {
+    document.getElementById('ai-response').textContent = 'Error: Could not reach mirror'
+  }
+}
+
+function quickCmd(cmd) {
+  showPage('ai')
+  document.getElementById('ai-input').value = cmd
+  sendQuery(cmd)
+}
+
+document.getElementById('ai-send').onclick = () => {
+  const val = document.getElementById('ai-input').value.trim()
+  if (!val) return
+  sendQuery(val)
+  document.getElementById('ai-input').value = ''
+}
+document.getElementById('ai-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { sendQuery(e.target.value.trim()); e.target.value = '' }
+})
+
+// ── Backlight
+async function setLight(mode) {
+  document.querySelectorAll('.light-btn').forEach(b => b.classList.remove('active'))
+  const btn = document.getElementById('light-' + mode)
+  if (btn) btn.classList.add('active')
+  await fetch('/api/backlight', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode })
+  })
+}
+
+// ── Volume
+async function setVolume(value) {
+  await fetch('/api/voice/volume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume: parseInt(value) })
+  })
+}
+
+// ── Widget toggles (sent to mirror via socket)
+function toggleWidget(name, btn) {
+  btn.classList.toggle('on')
+  const visible = btn.classList.contains('on')
+  socket.emit('widget-toggle', { widget: name, visible })
+}
+
+// ── Push announcement
+function pushAnnouncement() {
+  const text = document.getElementById('announce-text').value.trim()
+  if (!text) return
+  socket.emit('announcement', { text })
+  document.getElementById('announce-text').value = ''
+}
+
+// ── Status refresh
+async function refreshStatus() {
+  try {
+    const res = await fetch('/api/status')
+    const data = await res.json()
+    const intg = data.integrations || {}
+
+    const setStatus = (id, live) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.textContent = live ? 'Live' : 'Not connected'
+      el.className = 'int-status ' + (live ? 'int-live' : 'int-off')
+    }
+    setStatus('int-google',   intg.google)
+    setStatus('int-calendar', intg.google)
+    setStatus('int-whatsapp', intg.whatsapp)
+    setStatus('int-claude',   intg.claude)
+    setStatus('int-weather',  intg.weather)
+    setStatus('int-spotify',  intg.spotify?.connected)
+
+    // Spotify status dot in Controls tab
+    const dot = document.getElementById('spotify-dot')
+    if (dot) dot.style.background = intg.spotify?.connected ? '#1DB954' : '#444'
+
+    const uptime = Math.floor((data.uptime || 0) / 60)
+    document.getElementById('sys-uptime').textContent = uptime + ' min'
+    const memMB = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024)
+    document.getElementById('sys-mem').textContent = memMB + ' MB'
+    document.getElementById('sys-node').textContent = data.nodeVersion || '--'
+  } catch (e) {
+    console.error('Status fetch failed:', e)
+  }
+}
+
+// ── YouTube
+document.getElementById('yt-search-btn').onclick = () => {
+  const q = document.getElementById('yt-search-input').value.trim()
+  if (!q) return
+  document.getElementById('ai-response').textContent = 'Playing on mirror...'
+  sendQuery('play ' + q + ' on YouTube')
+  document.getElementById('yt-search-input').value = ''
+}
+document.getElementById('yt-search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('yt-search-btn').click()
+})
+
+function closeYouTube() {
+  socket.emit('youtube-close-from-companion')
+  fetch('/api/youtube/closed', { method: 'POST' }).catch(() => {})
+  document.getElementById('yt-controls-card').style.display = 'none'
+}
+
+socket.on('youtube-play', () => {
+  document.getElementById('yt-controls-card').style.display = 'block'
+})
+socket.on('youtube-closed', () => {
+  document.getElementById('yt-controls-card').style.display = 'none'
+})
+
+// ── Trigger briefing
+async function triggerBriefing() {
+  showPage('ai')
+  document.getElementById('ai-response').textContent = 'Generating briefing...'
+  await fetch('/api/briefing', { method: 'POST' })
+}
+
+// ── Memory log
+async function pollMemory() {
+  try {
+    const res = await fetch('/api/voice/history')
+    const data = await res.json()
+    renderMemory(data.history || [])
+  } catch (e) {}
+}
+
+function renderMemory(history) {
+  const log = document.getElementById('mem-log')
+  const empty = document.getElementById('mem-empty')
+  const depthLabel = document.getElementById('mem-depth-label')
+  const depth = Math.floor(history.length / 2)
+
+  depthLabel.textContent = `${depth} of 5 exchanges`
+
+  // Clear existing exchanges (keep empty msg)
+  log.querySelectorAll('.mem-exchange').forEach(el => el.remove())
+
+  if (history.length === 0) {
+    if (empty) empty.style.display = 'block'
+    return
+  }
+  if (empty) empty.style.display = 'none'
+
+  // Render pairs: history is [user, assistant, user, assistant, ...]
+  for (let i = 0; i < history.length; i += 2) {
+    const userMsg = history[i]
+    const aiMsg   = history[i + 1]
+    if (!userMsg) continue
+
+    const wrap = document.createElement('div')
+    wrap.className = 'mem-exchange'
+    wrap.innerHTML = `
+      <div class="mem-label">You</div>
+      <div class="mem-user">${userMsg.content}</div>
+      ${aiMsg ? `<div class="mem-label" style="margin-top:4px">Mirror</div><div class="mem-assistant">${aiMsg.content}</div>` : ''}
+    `
+    log.appendChild(wrap)
+  }
+}
+
+async function clearMemory() {
+  await fetch('/api/voice/history/clear', { method: 'POST' })
+  renderMemory([])
+}
+
+// Poll memory every 3s
+pollMemory()
+setInterval(pollMemory, 3000)
+
+refreshStatus()
+
+// ── Spotify controls ──────────────────────────────────────────
+let companionSpotifyPaused = false
+let spotifyVolDebounce = null
+
+document.getElementById('spotify-search-btn').onclick = () => {
+  const q = document.getElementById('spotify-search-input').value.trim()
+  if (!q) return
+  document.getElementById('ai-response').textContent = 'Playing on mirror...'
+  sendQuery('play ' + q + ' on spotify')
+  document.getElementById('spotify-search-input').value = ''
+  showPage('ai')
+}
+document.getElementById('spotify-search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('spotify-search-btn').click()
+})
+
+async function spotifyCtrl(action, value) {
+  await fetch('/api/spotify/control', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, value })
+  })
+  setTimeout(pollSpotifyNowPlaying, 800)
+}
+
+async function toggleSpotifyPlayPause() {
+  companionSpotifyPaused = !companionSpotifyPaused
+  await spotifyCtrl(companionSpotifyPaused ? 'pause' : 'resume')
+}
+
+function spotifySetVolume(value) {
+  clearTimeout(spotifyVolDebounce)
+  spotifyVolDebounce = setTimeout(() => {
+    spotifyCtrl('volume', parseInt(value))
+  }, 300)
+}
+
+async function pollSpotifyNowPlaying() {
+  try {
+    const res  = await fetch('/api/spotify/now-playing')
+    const data = await res.json()
+
+    const titleEl  = document.getElementById('spotify-np-title')
+    const artistEl = document.getElementById('spotify-np-artist')
+    const barEl    = document.getElementById('spotify-np-bar')
+    const artEl    = document.getElementById('spotify-np-art')
+
+    if (!data || !data.playing) {
+      if (titleEl)  titleEl.textContent  = 'Nothing playing'
+      if (artistEl) artistEl.textContent = 'Say "play music" to start'
+      if (barEl)    barEl.style.width    = '0%'
+      if (artEl)    artEl.innerHTML      = '♫'
+      companionSpotifyPaused = true
+      return
+    }
+
+    companionSpotifyPaused = false
+    if (titleEl)  titleEl.textContent  = data.title  || ''
+    if (artistEl) artistEl.textContent = data.artist || ''
+    if (barEl) {
+      const pct = Math.min(100, (data.progress / data.duration) * 100)
+      barEl.style.width = pct + '%'
+    }
+    if (artEl) {
+      if (data.coverUrl) {
+        artEl.innerHTML = '<img src="' + data.coverUrl +
+          '" style="width:40px;height:40px;object-fit:cover;border-radius:4px">'
+      } else {
+        artEl.innerHTML = '♫'
+      }
+    }
+  } catch (e) {}
+}
+
+pollSpotifyNowPlaying()
+setInterval(pollSpotifyNowPlaying, 5000)
+
+// ── Toast notification ─────────────────────
+function showToast(msg) {
+  let toast = document.getElementById('companion-toast')
+  if (!toast) {
+    toast = document.createElement('div')
+    toast.id = 'companion-toast'
+    toast.style.cssText = `
+      position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+      background:rgba(10,10,10,0.95);border:1px solid rgba(255,255,255,0.1);
+      border-radius:20px;padding:8px 18px;font-size:12px;color:var(--white);
+      z-index:999;transition:opacity 0.3s;pointer-events:none;white-space:nowrap`
+    document.body.appendChild(toast)
+  }
+  toast.textContent = msg
+  toast.style.opacity = '1'
+  clearTimeout(toast._timer)
+  toast._timer = setTimeout(() => { toast.style.opacity = '0' }, 2500)
+}
+
+// ── Photos / Slideshow ─────────────────────
+async function uploadPhotos(files) {
+  if (!files || files.length === 0) return
+  const form = new FormData()
+  Array.from(files).forEach(f => form.append('photos', f))
+
+  const progress    = document.getElementById('upload-progress')
+  const progressBar = document.getElementById('upload-progress-bar')
+  const progressTxt = document.getElementById('upload-progress-text')
+  if (progress) { progress.style.display = 'block'; progressBar.style.width = '30%' }
+  if (progressTxt) progressTxt.textContent = 'Uploading ' + files.length + ' photo(s)...'
+
+  try {
+    const res  = await fetch('/api/photos/upload', { method: 'POST', body: form })
+    const data = await res.json()
+    if (progressBar) progressBar.style.width = '100%'
+    if (data.success) {
+      showToast('✓ ' + data.count + ' photo(s) uploaded')
+      loadPhotoGrid()
+    } else {
+      showToast('Error: ' + (data.error || 'Upload failed'))
+    }
+  } catch (e) {
+    showToast('Upload failed')
+  } finally {
+    setTimeout(() => {
+      if (progress) progress.style.display = 'none'
+      if (progressBar) progressBar.style.width = '0%'
+    }, 800)
+  }
+}
+
+async function loadPhotoGrid() {
+  try {
+    const res  = await fetch('/api/photos')
+    const data = await res.json()
+    const grid = document.getElementById('photo-grid')
+    const countEl = document.getElementById('photo-count')
+    if (countEl) countEl.textContent = data.count + ' photo' + (data.count !== 1 ? 's' : '')
+
+    if (!grid) return
+    if (data.photos.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;font-size:11px;color:var(--dimmer);padding:12px 0">No photos yet</div>'
+      return
+    }
+    grid.innerHTML = data.photos.map(p => `
+      <div style="position:relative;border-radius:6px;overflow:hidden;aspect-ratio:1">
+        <img src="${p.url}" style="width:100%;height:100%;object-fit:cover;display:block"
+          loading="lazy" onerror="this.parentElement.style.display='none'">
+        <div onclick="deletePhoto('${p.filename}')" style="
+          position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.75);
+          color:#f04a4a;border-radius:50%;width:18px;height:18px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:9px;cursor:pointer;line-height:1">✕</div>
+      </div>
+    `).join('')
+  } catch (e) {}
+}
+
+async function deletePhoto(filename) {
+  try {
+    await fetch('/api/photos/' + encodeURIComponent(filename), { method: 'DELETE' })
+    loadPhotoGrid()
+    showToast('Photo removed')
+  } catch (e) { showToast('Delete failed') }
+}
+
+async function clearAllPhotos() {
+  if (!confirm('Remove all photos from the slideshow?')) return
+  try {
+    await fetch('/api/photos/all/clear', { method: 'DELETE' })
+    loadPhotoGrid()
+    showToast('All photos cleared')
+  } catch (e) { showToast('Clear failed') }
+}
+
+async function saveSettings() {
+  const interval   = document.getElementById('ss-interval').value
+  const transition = document.getElementById('ss-transition').value
+  const order      = document.getElementById('ss-order').value
+  const label      = document.getElementById('photo-interval-label')
+  if (label) label.textContent = interval + 's per slide'
+  try {
+    await fetch('/api/photos/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interval: parseInt(interval), transition, order })
+    })
+    showToast('Settings saved')
+  } catch (e) {}
+}
+
+function showOnMirror() {
+  socket.emit('slideshow-control', { action: 'show' })
+  showToast('Showing on mirror')
+}
+
+// Bind file input
+document.getElementById('photoUpload').addEventListener('change', e => {
+  uploadPhotos(e.target.files)
+  e.target.value = ''
+})
+
+// Load photo grid when Controls tab opens
+const _origShowPage = showPage
+function showPage(name) {
+  _origShowPage(name)
+  if (name === 'controls') loadPhotoGrid()
+}
+
+// Initial load
+loadPhotoGrid()
+
+// Socket events from mirror
+socket.on('photos-updated', () => loadPhotoGrid())
+</script>
+
+</body>
+</html>

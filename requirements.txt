@@ -1,0 +1,17 @@
+# MirrorOS — Python dependencies
+# Install: pip3 install -r requirements.txt
+
+# Wake word detection (Porcupine by Picovoice)
+pvporcupine>=3.0.0
+
+# Audio I/O
+pyaudio>=0.2.13
+
+# Speech-to-text (Whisper Tiny ONLY — RAM constraint on Orange Pi)
+openai-whisper>=20231117
+
+# HTTP requests (used by wakeword.py to call backend)
+requests>=2.31.0
+
+# Text-to-speech
+pyttsx3>=2.90

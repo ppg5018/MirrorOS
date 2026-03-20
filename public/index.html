@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirrorOS</title>
+
+  <!-- Spotify Web Playback SDK -->
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/mirror.css" />
+</head>
+
+<body>
+
+  <!-- Scan line -->
+  <div class="scanline"></div>
+
+  <!-- ======================== TOP BAR ======================== -->
+  <header class="top-bar">
+
+    <!-- Brand Mark (left) -->
+    <div class="brand-mark">
+      <div class="brand-logo">
+        <div class="brand-logo-dot"></div>
+      </div>
+      <span class="brand-name">MirrorOS</span>
+    </div>
+
+    <!-- Quote (center) -->
+    <div class="nav-quote">
+      <span id="quote-text" class="quote-text">...</span><span
+        class="quote-sep"> — </span><span
+        id="quote-author-name" class="quote-author"></span>
+    </div>
+
+    <!-- Live indicator (right) -->
+    <div class="nav-live">
+      <span class="live-dot"></span>
+      <span class="live-label">Live</span>
+    </div>
+
+    <!-- Hidden compat elements for JS setState() -->
+    <div style="display:none">
+      <span class="nav-tab">State</span>
+      <span class="nav-tab active">Idle</span>
+      <span class="nav-tab">Listening</span>
+      <span class="nav-tab">Responding</span>
+    </div>
+
+  </header>
+
+  <!-- ======================== MAIN GRID ======================== -->
+  <div class="mirror-grid">
+
+    <!-- Hidden JS compat elements -->
+    <div style="display:none" aria-hidden="true">
+      <span id="tod-greeting"></span>
+      <span id="tod-sub"></span>
+      <span id="clock-greeting"></span>
+    </div>
+
+    <!-- ════════ COL 1: Clock + Weather + Tasks ════════ -->
+    <div class="col col-left mirror-widget">
+
+      <!-- Clock -->
+      <div class="clock-widget" id="widget-clock">
+        <div class="clock-time">
+          <span id="clock-h">--</span>
+          <span class="clock-sep">:</span>
+          <span id="clock-m">--</span>
+        </div>
+        <div class="clock-date" id="clock-date">--</div>
+        <div class="clock-rule"></div>
+      </div>
+
+      <!-- Weather -->
+      <div class="weather-widget" id="widget-weather">
+        <div class="widget-label">Weather</div>
+        <div class="weather-main">
+          <div id="weather-icon" class="weather-icon"></div>
+          <div>
+            <div class="weather-temp">28°</div>
+            <div class="weather-condition">Pune · Partly Cloudy</div>
+          </div>
+        </div>
+
+        <div class="weather-forecast">
+          <div class="forecast-day">
+            <span class="day-name">THU</span>
+            <div class="day-icon" id="forecast-icon-0"></div>
+            <span class="day-temp-hi">31°</span>
+            <span class="day-temp-lo">22°</span>
+          </div>
+          <div class="forecast-day">
+            <span class="day-name">FRI</span>
+            <div class="day-icon" id="forecast-icon-1"></div>
+            <span class="day-temp-hi">28°</span>
+            <span class="day-temp-lo">21°</span>
+          </div>
+          <div class="forecast-day">
+            <span class="day-name">SAT</span>
+            <div class="day-icon" id="forecast-icon-2"></div>
+            <span class="day-temp-hi">25°</span>
+            <span class="day-temp-lo">20°</span>
+          </div>
+          <div class="forecast-day">
+            <span class="day-name">SUN</span>
+            <div class="day-icon" id="forecast-icon-3"></div>
+            <span class="day-temp-hi">23°</span>
+            <span class="day-temp-lo">18°</span>
+          </div>
+        </div>
+
+        <div class="weather-tags">
+          <div class="weather-tag weather-tag-humidity">
+            <span class="tag-dot-blue">◈</span>
+            <span class="tag-text">65% Humidity</span>
+          </div>
+          <div class="weather-tag weather-tag-aqi">
+            <span class="tag-dot-orange">●</span>
+            <span class="tag-text">AQI 78 · Moderate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row divider -->
+      <div class="row-divider row-divider-left"></div>
+
+      <!-- Tasks -->
+      <div class="tasks-widget" id="widget-tasks">
+        <div class="tasks-header">
+          <div class="widget-label" style="margin-bottom:0">Tasks</div>
+          <span class="tasks-done-counter" id="tasks-done-counter"></span>
+        </div>
+        <div class="tasks-progress-bar">
+          <div class="tasks-progress-fill" id="tasks-progress-fill"></div>
+        </div>
+        <div class="tasks-list" id="tasks-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Column divider -->
+    <div class="col-divider"></div>
+
+    <!-- ════════ COL 2: AI Panel + Calendar ════════ -->
+    <div class="col col-center">
+
+      <!-- AI Assistant Card -->
+      <div class="ai-card" id="widget-ai-bar">
+        <div class="ai-corner ai-corner-tl"></div>
+        <div class="ai-corner ai-corner-tr"></div>
+        <div class="ai-corner ai-corner-bl"></div>
+        <div class="ai-corner ai-corner-br"></div>
+
+        <div class="ai-card-top">
+          <span class="ai-card-label">AI Assistant</span>
+          <div class="ai-live-dot"></div>
+        </div>
+        <div class="ai-card-greeting">Good morning, Arjun</div>
+        <div class="ai-card-hint">Say <span>"Hey Mirror"</span> to begin</div>
+
+        <div class="ai-waveform" id="ai-waveform">
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+          <div class="wf-bar"></div>
+        </div>
+
+        <!-- Hidden compat elements -->
+        <div id="memory-dots" style="display:none">
+          <span class="mdot"></span><span class="mdot"></span><span class="mdot"></span>
+          <span class="mdot"></span><span class="mdot"></span>
+        </div>
+      </div>
+
+      <!-- Today's Schedule -->
+      <div class="schedule-widget mirror-widget" id="widget-calendar" style="padding-left:20px">
+        <div class="widget-label">Today's Schedule</div>
+      </div>
+
+    </div>
+
+    <!-- Column divider -->
+    <div class="col-divider"></div>
+
+    <!-- ════════ COL 3: Notifications + Music + Wallpaper ════════ -->
+    <div class="col col-right mirror-widget">
+
+      <!-- Notifications -->
+      <div class="notifications-widget" id="widget-notifications">
+        <div class="widget-label">Notifications</div>
+      </div>
+
+      <!-- Row divider -->
+      <div class="row-divider"></div>
+
+      <!-- Now Playing -->
+      <div class="now-playing-section">
+        <div class="widget-label">
+          <!-- Figma SpotifyLogo SVG -->
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="11" fill="rgba(30,215,96,0.20)" stroke="rgba(30,215,96,0.75)" stroke-width="1"/>
+            <path d="M7 15.5c2.5-1 5.5-.8 7.5.5" stroke="rgba(30,215,96,1.0)" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M6.5 12.5c3-1.2 6.5-1 9 .8" stroke="rgba(30,215,96,1.0)" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M6 9.5c3.5-1.4 7.5-1.2 10.5 1" stroke="rgba(30,215,96,1.0)" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Now Playing
+        </div>
+        <div id="widget-music" style="display:none">
+          <div class="music-inner">
+            <div id="music-art" class="music-art">
+              <span class="music-note">♪</span>
+            </div>
+            <div class="music-info">
+              <span id="music-source" class="music-source"></span>
+              <div id="music-title" class="music-title"></div>
+              <div id="music-artist" class="music-artist"></div>
+              <div class="music-controls">
+                <!-- Figma PrevIcon -->
+                <button class="music-btn" onclick="mediaCommand('prev')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="2.5" height="16" rx="1"/></svg>
+                </button>
+                <!-- Figma PauseIcon (default state — toggled by JS) -->
+                <button class="music-btn music-btn-play" onclick="mediaCommand('toggle')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                </button>
+                <!-- Figma NextIcon -->
+                <button class="music-btn" onclick="mediaCommand('next')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16.5" y="4" width="2.5" height="16" rx="1"/></svg>
+                </button>
+                <!-- Figma HeartIcon (unfilled) -->
+                <button class="music-btn music-btn-heart">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </button>
+              </div>
+              <div class="music-bar-wrap">
+                <div id="music-bar-fill" class="music-bar-fill"></div>
+              </div>
+              <div class="music-time-row">
+                <span id="music-time-start" class="music-time">0:00</span>
+                <span id="music-time-end" class="music-time">0:00</span>
+              </div>
+              <!-- Legacy compat element -->
+              <div id="music-time" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+        <div class="now-playing-empty" id="now-playing-empty">Nothing playing</div>
+      </div>
+
+      <!-- Row divider -->
+      <div class="row-divider"></div>
+
+      <!-- Ambient Art -->
+      <div class="ambient-art-widget" id="widget-wallpaper">
+        <div class="widget-label">Ambient Art</div>
+        <div class="ambient-art-frame" id="wallpaper-drop"
+          onclick="document.getElementById('wallpaper-input').click()">
+          <div class="wallpaper-thumb" id="wallpaper-thumb"></div>
+
+          <!-- Corner brackets -->
+          <div class="art-corner art-corner-tl"></div>
+          <div class="art-corner art-corner-tr"></div>
+          <div class="art-corner art-corner-bl"></div>
+          <div class="art-corner art-corner-br"></div>
+
+          <div class="ambient-art-overlay">
+            <span class="ambient-art-title">Himalayan Valley</span>
+            <span class="ambient-art-badge">DAILY · AUTO</span>
+          </div>
+          <div class="ambient-art-empty">
+            <span class="wallpaper-drop-icon">⊞</span>
+            <span id="wallpaper-drop-text" class="wallpaper-drop-text">Drop image or click</span>
+          </div>
+          <input type="file" id="wallpaper-input" accept="image/*" style="display:none">
+        </div>
+        <div class="wallpaper-clear" id="wallpaper-clear">✕ Remove</div>
+      </div>
+
+    </div>
+
+  </div><!-- /mirror-grid -->
+
+  <!-- Hidden status elements for JS compat -->
+  <div style="display:none" aria-hidden="true">
+    <div class="status-bar-left"><span>v1.4.1</span></div>
+    <span class="status-value"></span>
+    <span class="conn-dot" id="conn-dot-google"></span>
+    <span class="conn-dot" id="conn-dot-weather"></span>
+    <span class="conn-dot" id="conn-dot-claude"></span>
+    <span class="conn-dot" id="conn-dot-whatsapp"></span>
+  </div>
+
+  <!-- YouTube Overlay — created dynamically by youtube-player.js -->
+
+  <!-- Spotify not-connected hint -->
+  <div id="spotify-hint" style="
+    display:none; position:fixed; bottom:40px; right:18px;
+    background:rgba(10,10,10,0.95); border:1px solid rgba(30,215,96,0.2);
+    border-radius:10px; padding:10px 14px; z-index:60;
+    align-items:center; gap:10px; font-family:'Inter',sans-serif;">
+    <span style="font-size:14px">♫</span>
+    <div>
+      <div style="font-size:10px;color:rgba(30,215,96,0.8);">Spotify not connected</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px">Run: npm run setup:spotify</div>
+    </div>
+  </div>
+
+  <!-- Music visibility bridge: show empty state when music widget is hidden -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var music = document.getElementById('widget-music')
+      var empty = document.getElementById('now-playing-empty')
+      if (!music || !empty) return
+      new MutationObserver(function () {
+        empty.style.display = (music.style.display === 'block') ? 'none' : 'block'
+      }).observe(music, { attributes: true, attributeFilter: ['style'] })
+    })
+  </script>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/backlight.js"></script>
+  <script src="js/media.js"></script>
+  <script src="js/weather-icons.js"></script>
+  <script src="js/slideshow.js"></script>
+  <script src="js/music-widget.js"></script>
+  <script src="js/news-ticker.js"></script>
+  <script src="js/youtube-player.js"></script>
+  <script src="js/spotify-player.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>
