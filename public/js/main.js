@@ -716,6 +716,18 @@ function initWallpaper() {
   if (clear) clear.addEventListener('click', (e) => { e.preventDefault(); clearWallpaper() })
 }
 
+// ── Fitness mode redirect ────────────────
+if (typeof socket !== 'undefined') {
+  socket.on('fitness:state', function (data) {
+    if (data.state && data.state !== 'idle' && data.state !== 'complete' && window.location.pathname === '/') {
+      window.location.href = '/fitness'
+    }
+  })
+  socket.on('fitness:redirect', function (data) {
+    if (data.url) window.location.href = data.url
+  })
+}
+
 fetchAll()
 fetchNews()
 

@@ -1,0 +1,107 @@
+{
+  "id": "morning-yoga",
+  "name": "Morning Yoga Flow",
+  "category": "yoga",
+  "difficulty": "beginner",
+  "durationMinutes": 20,
+  "estimatedCalories": 120,
+  "description": "Gentle morning stretch and yoga flow to start your day",
+  "exercises": [
+    {
+      "exerciseId": "3216",
+      "name": "Downward Dog",
+      "target": "hamstrings",
+      "secondaryMuscles": ["shoulders", "calves", "back"],
+      "instructions": ["Start on hands and knees", "Push hips up and back straightening your legs", "Press heels toward the floor", "Keep arms straight and head between biceps"],
+      "sets": 1,
+      "reps": 45,
+      "restSeconds": 10,
+      "formTip": "Breathe deeply, press hips high",
+      "metValue": 2.5
+    },
+    {
+      "exerciseId": "3327",
+      "name": "Cobra Stretch",
+      "target": "abs",
+      "secondaryMuscles": ["lower back", "chest"],
+      "instructions": ["Lie face down with hands under shoulders", "Press up lifting chest off the floor", "Keep hips on the ground and open your chest", "Hold and breathe deeply"],
+      "sets": 1,
+      "reps": 30,
+      "restSeconds": 10,
+      "formTip": "Open your chest, pull shoulders back",
+      "metValue": 2.0
+    },
+    {
+      "exerciseId": "1472",
+      "name": "Plank",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "glutes", "quads"],
+      "instructions": ["Place forearms on the ground with elbows under shoulders", "Extend legs back and rise onto your toes", "Keep body in a straight line from head to heels", "Hold position while breathing steadily"],
+      "sets": 1,
+      "reps": 45,
+      "restSeconds": 10,
+      "formTip": "Engage core, keep breathing",
+      "metValue": 3.0
+    },
+    {
+      "exerciseId": "3533",
+      "name": "Glute Bridge",
+      "target": "glutes",
+      "secondaryMuscles": ["hamstrings", "lower back"],
+      "instructions": ["Lie on your back with knees bent and feet flat", "Push hips up toward the ceiling", "Squeeze glutes hard at the top", "Lower back down slowly with control"],
+      "sets": 1,
+      "reps": 30,
+      "restSeconds": 10,
+      "formTip": "Squeeze glutes at the top, open hips",
+      "metValue": 2.5
+    },
+    {
+      "exerciseId": "1326",
+      "name": "Seated Forward Bend",
+      "target": "hamstrings",
+      "secondaryMuscles": ["lower back", "calves"],
+      "instructions": ["Sit with legs extended straight in front", "Reach forward toward your toes", "Hold the stretch breathing deeply", "Keep spine long and do not round excessively"],
+      "sets": 1,
+      "reps": 30,
+      "restSeconds": 10,
+      "formTip": "Long spine, pull gently with arms",
+      "metValue": 2.0
+    },
+    {
+      "exerciseId": "3219",
+      "name": "Neck Side Stretch",
+      "target": "neck",
+      "secondaryMuscles": ["traps", "upper back"],
+      "instructions": ["Stand or sit with good posture", "Tilt head to one side bringing ear toward shoulder", "Hold the stretch gently for several breaths", "Repeat on the other side"],
+      "sets": 1,
+      "reps": 30,
+      "restSeconds": 10,
+      "formTip": "Relax shoulders, breathe into the stretch",
+      "metValue": 2.0
+    },
+    {
+      "exerciseId": "3360",
+      "name": "Tree Pose",
+      "target": "legs",
+      "secondaryMuscles": ["core", "ankles", "hips"],
+      "instructions": ["Stand on one leg with the other foot on your inner thigh", "Bring hands together at chest or overhead", "Fix your gaze on one point for balance", "Hold and breathe then switch sides"],
+      "sets": 1,
+      "reps": 30,
+      "restSeconds": 10,
+      "formTip": "Hold balance, fix gaze on one point",
+      "metValue": 2.5
+    },
+    {
+      "exerciseId": "3318",
+      "name": "Savasana",
+      "target": "full body",
+      "secondaryMuscles": ["mind", "nervous system"],
+      "instructions": ["Lie flat on your back with arms at sides", "Close your eyes and relax every muscle", "Focus on slow deep breathing", "Stay still and release all tension"],
+      "sets": 1,
+      "reps": 60,
+      "restSeconds": 0,
+      "formTip": "Relax everything, breathe deeply",
+      "metValue": 1.0
+    }
+  ]
+}

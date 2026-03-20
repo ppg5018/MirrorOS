@@ -209,6 +209,51 @@
   .page { display: none; }
   .page.active { display: block; }
 
+  /* ── Fitness Tab ── */
+  .section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0; cursor: pointer; border-bottom: 1px solid var(--border);
+  }
+  .section-header-title {
+    font-size: 13px; font-weight: 500; color: var(--white);
+  }
+  .section-chevron { font-size: 13px; color: var(--dimmer); transition: transform 0.2s; }
+  .section-body { padding-top: 10px; }
+  .fit-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color 0.15s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fit-card:active { opacity: 0.65; }
+  .fit-card-name { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
+  .fit-card-badge {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 10px;
+    background: rgba(74,240,196,0.1); color: var(--accent); flex-shrink: 0;
+  }
+  .fit-card-meta { font-size: 11px; color: var(--dimmer); margin-top: 4px; }
+  .fit-ex-row {
+    padding: 10px 12px; border-radius: 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    margin-bottom: 6px; cursor: pointer; transition: border-color 0.15s;
+  }
+  .fit-ex-row:active { opacity: 0.65; }
+  .fit-build-row {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; margin-bottom: 8px;
+  }
+  .fit-num-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 8px; color: var(--white);
+    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    text-align: center; outline: none;
+  }
+  .fit-stat-pill {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 6px; text-align: center;
+  }
+
   /* Memory log */
   .memory-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -548,6 +593,53 @@
   </div>
 </div>
 
+<!-- PAGE 4: Fitness -->
+<div class="page" id="page-fitness">
+  <div class="section" style="padding-top:16px">
+
+    <!-- Section A: Start Workout -->
+    <div class="section-header" onclick="toggleFitSection('start')">
+      <span class="section-header-title">💪 Start Workout</span>
+      <span class="section-chevron" id="chevron-start">▾</span>
+    </div>
+    <div id="section-start" class="section-body">
+      <div id="workout-cards" style="padding-top:4px">
+        <div style="font-size:11px;color:var(--dimmer);padding:8px 0">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Section B: Build Workout -->
+    <div class="section-header" onclick="toggleFitSection('build')">
+      <span class="section-header-title">🛠 Build Workout</span>
+      <span class="section-chevron" id="chevron-build">▸</span>
+    </div>
+    <div id="section-build" class="section-body" style="display:none">
+      <input class="ai-input" id="fit-workout-name" type="text"
+        placeholder="Workout name..." style="width:100%;margin-bottom:10px;margin-top:4px">
+      <input class="ai-input" id="fit-search" type="text"
+        placeholder="Search exercises (push, squat, plank...)..."
+        style="width:100%;margin-bottom:6px">
+      <div id="fit-search-results" style="margin-bottom:8px"></div>
+      <div id="fit-build-list" style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--dimmer);padding:6px 0">No exercises added yet.</div>
+      </div>
+      <button class="btn primary" onclick="saveCustomWorkout()">Save Workout</button>
+    </div>
+
+    <!-- Section C: History -->
+    <div class="section-header" onclick="toggleFitSection('history-fit')">
+      <span class="section-header-title">📊 History</span>
+      <span class="section-chevron" id="chevron-history-fit">▸</span>
+    </div>
+    <div id="section-history-fit" class="section-body" style="display:none">
+      <div id="fit-history-content" style="padding-top:4px">
+        <div style="font-size:11px;color:var(--dimmer)">Tap to load history.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Bottom Nav -->
 <div class="bottom-nav">
   <div class="nav-item active" id="nav-ai" onclick="showPage('ai')">
@@ -558,6 +650,9 @@
   </div>
   <div class="nav-item" id="nav-status" onclick="showPage('status')">
     <span class="nav-icon">◉</span>Status
+  </div>
+  <div class="nav-item" id="nav-fitness" onclick="showPage('fitness')">
+    <span class="nav-icon">💪</span>Fitness
   </div>
 </div>
 
@@ -992,6 +1087,263 @@ loadPhotoGrid()
 
 // Socket events from mirror
 socket.on('photos-updated', () => loadPhotoGrid())
+
+// ── Fitness Tab ──────────────────────────────────────────────────
+
+let _buildExercises  = []
+let _searchDebounce  = null
+
+function toggleFitSection(name) {
+  const body = document.getElementById('section-' + name)
+  const chev = document.getElementById('chevron-' + name)
+  const isOpen = body.style.display !== 'none'
+  body.style.display = isOpen ? 'none' : 'block'
+  chev.textContent   = isOpen ? '▸' : '▾'
+  if (!isOpen) {
+    if (name === 'start')       loadWorkoutCards()
+    if (name === 'history-fit') loadFitnessHistory()
+  }
+}
+
+// Load workout cards
+async function loadWorkoutCards() {
+  const el = document.getElementById('workout-cards')
+  if (!el) return
+  try {
+    const res      = await fetch('/api/fitness/workouts')
+    const workouts = await res.json()
+    if (!workouts.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--dimmer);padding:8px 0">No workouts found. Build one below!</div>'
+      return
+    }
+    el.innerHTML = workouts.map(w => `
+      <div class="fit-card" onclick="startWorkoutFromCompanion('${w.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div class="fit-card-name">${w.name}</div>
+          <div class="fit-card-badge">${w.difficulty || 'any'}</div>
+        </div>
+        <div class="fit-card-meta">⏱ ${w.durationMinutes} min · 🔥 ${w.estimatedCalories || '—'} cal · ${w.exerciseCount} exercises</div>
+      </div>
+    `).join('')
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load workouts.</div>'
+  }
+}
+
+// Start a workout from companion → mirror switches to fitness page
+async function startWorkoutFromCompanion(workoutId) {
+  try {
+    const res  = await fetch('/api/fitness/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workoutId })
+    })
+    const data = await res.json()
+    if (data.error) { showToast('Error: ' + data.error); return }
+    showToast('Starting on mirror 💪')
+  } catch (e) {
+    showToast('Failed to start workout')
+  }
+}
+
+// Exercise search with debounce
+document.addEventListener('DOMContentLoaded', () => {
+  const searchEl = document.getElementById('fit-search')
+  if (searchEl) {
+    searchEl.addEventListener('input', function () {
+      clearTimeout(_searchDebounce)
+      _searchDebounce = setTimeout(() => searchExercises(this.value.trim()), 320)
+    })
+  }
+})
+
+async function searchExercises(q) {
+  const el = document.getElementById('fit-search-results')
+  if (!el) return
+  if (!q) { el.innerHTML = ''; return }
+  try {
+    const res       = await fetch('/api/fitness/exercises/search?q=' + encodeURIComponent(q))
+    const exercises = await res.json()
+    if (!exercises.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--dimmer);padding:4px 0">No results for "' + q + '"</div>'
+      return
+    }
+    el.innerHTML = exercises.map(ex => {
+      const safeId   = ex.id
+      const safeName = ex.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      const safeTgt  = (ex.target || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      return `<div class="fit-ex-row"
+        onclick="addExerciseToBuild('${safeId}','${safeName}','${safeTgt}')">
+        <div style="font-size:13px">${ex.name}</div>
+        <div style="font-size:10px;color:var(--dimmer);margin-top:2px">${ex.target} · ${ex.equipment}</div>
+      </div>`
+    }).join('')
+  } catch (e) { /* silent */ }
+}
+
+function addExerciseToBuild(id, name, target) {
+  if (_buildExercises.find(e => e.exerciseId === id)) { showToast('Already added'); return }
+  _buildExercises.push({ exerciseId: id, name, target, sets: 3, reps: 10, restSeconds: 60 })
+  renderBuildList()
+  document.getElementById('fit-search').value = ''
+  document.getElementById('fit-search-results').innerHTML = ''
+  showToast(name + ' added')
+}
+
+function renderBuildList() {
+  const el = document.getElementById('fit-build-list')
+  if (!el) return
+  if (!_buildExercises.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--dimmer);padding:6px 0">No exercises added yet.</div>'
+    return
+  }
+  el.innerHTML = _buildExercises.map((ex, i) => `
+    <div class="fit-build-row">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:13px;font-weight:500">${ex.name}</div>
+          <div style="font-size:10px;color:var(--dimmer);margin-top:1px">${ex.target}</div>
+        </div>
+        <button onclick="removeBuildExercise(${i})"
+          style="background:transparent;border:none;color:var(--danger);font-size:18px;cursor:pointer;line-height:1;padding:4px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-bottom:4px">SETS</div>
+          <input class="fit-num-input" type="number" min="1" max="10" value="${ex.sets}"
+            onchange="_buildExercises[${i}].sets = parseInt(this.value) || 1">
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-bottom:4px">REPS</div>
+          <input class="fit-num-input" type="number" min="1" max="100" value="${ex.reps}"
+            onchange="_buildExercises[${i}].reps = parseInt(this.value) || 10">
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-bottom:4px">REST (s)</div>
+          <input class="fit-num-input" type="number" min="0" max="300" value="${ex.restSeconds}"
+            onchange="_buildExercises[${i}].restSeconds = parseInt(this.value) || 0">
+        </div>
+      </div>
+    </div>
+  `).join('')
+}
+
+function removeBuildExercise(i) {
+  _buildExercises.splice(i, 1)
+  renderBuildList()
+}
+
+async function saveCustomWorkout() {
+  const nameEl = document.getElementById('fit-workout-name')
+  const name   = nameEl ? nameEl.value.trim() : ''
+  if (!name)                    { showToast('Enter a workout name'); return }
+  if (!_buildExercises.length)  { showToast('Add at least one exercise'); return }
+
+  const totalSecs = _buildExercises.reduce((s, e) =>
+    s + (e.sets * e.reps * 3) + (e.restSeconds * e.sets), 0)
+
+  const workout = {
+    id:                'custom-' + Date.now(),
+    name,
+    category:          'custom',
+    difficulty:        'custom',
+    durationMinutes:   Math.max(1, Math.round(totalSecs / 60)),
+    estimatedCalories: Math.round(_buildExercises.length * 25),
+    description:       'Custom workout',
+    exercises: _buildExercises.map(e => ({
+      exerciseId:  e.exerciseId,
+      name:        e.name,
+      target:      e.target,
+      sets:        e.sets,
+      reps:        e.reps,
+      restSeconds: e.restSeconds,
+      metValue:    5.0
+    }))
+  }
+
+  try {
+    const res  = await fetch('/api/fitness/workouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workout)
+    })
+    const data = await res.json()
+    if (data.success) {
+      showToast('Workout saved! ✓')
+      _buildExercises   = []
+      if (nameEl) nameEl.value = ''
+      renderBuildList()
+      loadWorkoutCards()
+    } else {
+      showToast('Save failed: ' + (data.error || 'unknown'))
+    }
+  } catch (e) {
+    showToast('Save failed')
+  }
+}
+
+// Fitness history section
+async function loadFitnessHistory() {
+  const el = document.getElementById('fit-history-content')
+  if (!el) return
+  el.innerHTML = '<div style="font-size:11px;color:var(--dimmer);padding:8px 0">Loading...</div>'
+  try {
+    const [stats, history] = await Promise.all([
+      fetch('/api/fitness/stats').then(r => r.json()),
+      fetch('/api/fitness/history?limit=5').then(r => r.json())
+    ])
+    const wk = stats.thisWeek || {}
+    const sessionsHtml = history.length
+      ? history.map(s => {
+          const d       = new Date(s.completedAt || s.startedAt)
+          const dateStr = d.toLocaleDateString('en', { month: 'short', day: 'numeric' })
+          const mins    = Math.round((s.durationSeconds || 0) / 60)
+          return `<div style="display:flex;justify-content:space-between;align-items:center;
+            padding:10px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:13px">${s.workoutName || '—'}</div>
+              <div style="font-size:10px;color:var(--dimmer);margin-top:2px">${dateStr} · ${mins} min</div>
+            </div>
+            <div style="font-size:12px;color:var(--danger)">${s.caloriesBurned || 0} cal</div>
+          </div>`
+        }).join('')
+      : '<div style="font-size:11px;color:var(--dimmer);padding:8px 0">No sessions yet.</div>'
+
+    el.innerHTML = `
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div class="fit-stat-pill">
+          <div style="font-size:20px">🔥 ${stats.currentStreak || 0}</div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-top:3px">STREAK</div>
+        </div>
+        <div class="fit-stat-pill">
+          <div style="font-size:18px;color:var(--accent);font-weight:500">${wk.workouts || 0}</div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-top:3px">THIS WEEK</div>
+        </div>
+        <div class="fit-stat-pill">
+          <div style="font-size:18px;color:var(--danger);font-weight:500">${wk.calories || 0}</div>
+          <div style="font-size:9px;color:var(--dimmer);letter-spacing:1px;margin-top:3px">CAL/WEEK</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--dimmer);letter-spacing:2px;margin-bottom:4px">RECENT SESSIONS</div>
+      ${sessionsHtml}
+    `
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--danger)">Failed to load history.</div>'
+  }
+}
+
+// Refresh workout cards if new one saved from another device
+socket.on('workouts-updated', () => {
+  const startSection = document.getElementById('section-start')
+  if (startSection && startSection.style.display !== 'none') loadWorkoutCards()
+})
+
+// Extend showPage to auto-load fitness data
+const _origShowPageFit = showPage
+function showPage(name) {
+  _origShowPageFit(name)
+  if (name === 'fitness') loadWorkoutCards()
+}
 </script>
 
 </body>

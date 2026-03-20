@@ -1,0 +1,83 @@
+{
+  "id": "upper-body",
+  "name": "Upper Body Strength",
+  "category": "strength",
+  "difficulty": "beginner",
+  "durationMinutes": 30,
+  "estimatedCalories": 220,
+  "description": "Build upper body strength with bodyweight and dumbbells",
+  "exercises": [
+    {
+      "exerciseId": "0662",
+      "name": "Push Up",
+      "target": "chest",
+      "secondaryMuscles": ["triceps", "shoulders", "core"],
+      "instructions": ["Start in high plank with hands shoulder-width apart", "Lower your chest toward the floor", "Push back up to starting position explosively", "Keep body in a straight line throughout"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Full range of motion, chest to ground",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "0294",
+      "name": "Dumbbell Shoulder Press",
+      "target": "shoulders",
+      "secondaryMuscles": ["triceps", "upper chest"],
+      "instructions": ["Hold dumbbells at shoulder height", "Press weights overhead until arms fully extend", "Lower back to shoulder height with control", "Keep core braced throughout the movement"],
+      "sets": 3,
+      "reps": 10,
+      "restSeconds": 60,
+      "formTip": "Keep elbows at 45 degrees, squeeze at the top",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "0334",
+      "name": "Dumbbell Lateral Raise",
+      "target": "shoulders",
+      "secondaryMuscles": ["traps"],
+      "instructions": ["Stand with dumbbells at your sides", "Raise arms out to sides until shoulder height", "Keep a slight bend in your elbows", "Lower back down slowly with control"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Slight bend in elbows, control the weight",
+      "metValue": 4.5
+    },
+    {
+      "exerciseId": "0312",
+      "name": "Dumbbell Bicep Curl",
+      "target": "biceps",
+      "secondaryMuscles": ["forearms"],
+      "instructions": ["Stand holding dumbbells at your sides", "Curl weights up by bending your elbows", "Squeeze biceps at the top of the movement", "Lower slowly back to the starting position"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Curl without swinging, full contraction",
+      "metValue": 4.0
+    },
+    {
+      "exerciseId": "0860",
+      "name": "Dumbbell Tricep Extension",
+      "target": "triceps",
+      "secondaryMuscles": ["shoulders"],
+      "instructions": ["Hold a dumbbell overhead with both hands", "Lower the weight behind your head by bending elbows", "Extend arms back to the starting position", "Keep elbows close to your head throughout"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Keep elbows close to head, extend fully",
+      "metValue": 4.0
+    },
+    {
+      "exerciseId": "3294",
+      "name": "Tricep Dip",
+      "target": "triceps",
+      "secondaryMuscles": ["chest", "shoulders"],
+      "instructions": ["Place hands on a bench or chair behind you", "Extend legs forward with heels on the ground", "Lower body by bending elbows to 90 degrees", "Push back up to starting position"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 45,
+      "formTip": "Control the dip, do not flare elbows wide",
+      "metValue": 5.0
+    }
+  ]
+}

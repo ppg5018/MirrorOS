@@ -1,8 +1,13 @@
 node_modules/
 .env
+.DS_Store
+**/.DS_Store
 config/wifi.conf
 config/google-token.json
 config/spotify-token.json
 *.log
 public/uploads/photos/
 public/uploads/thumbs/
+data/gifs/
+data/exercises.json
+data/workout-history.ndjson

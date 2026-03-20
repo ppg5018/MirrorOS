@@ -262,6 +262,23 @@ const functions = {
     return { text: q.text, author: q.author, reply: `"${q.text}" — ${q.author}` }
   },
 
+  fitness_control: async (input, _io) => {
+    if (input.action === 'list_workouts') {
+      return get('/api/fitness/workouts')
+    }
+    if (input.action === 'status') {
+      return get('/api/fitness/state')
+    }
+    if (input.action === 'start') {
+      return post('/api/fitness/start', {
+        workoutId: input.workoutId,
+        weightKg: input.weightKg
+      })
+    }
+    // pause, resume, skip, stop
+    return post('/api/fitness/action', { action: input.action })
+  },
+
   morning_briefing: async (_input, _io) => {
     const [weather, calendar, whatsapp, tasksRes] = await Promise.all([
       get('/api/weather'),

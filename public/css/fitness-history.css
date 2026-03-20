@@ -1,0 +1,186 @@
+/* ============================================
+   MirrorOS — Fitness History Page
+   ============================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #000;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#history-app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 48px 80px;
+}
+
+/* ── TOP BAR ── */
+#history-top-bar {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 48px;
+}
+.history-back-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #666;
+  text-decoration: none;
+  padding: 8px 18px;
+  border: 1px solid #333;
+  border-radius: 20px;
+  transition: all 0.2s;
+}
+.history-back-btn:hover { color: #fff; border-color: #fff; }
+.history-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #5EE8C0;
+}
+
+/* ── STATS ROW ── */
+#history-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 48px;
+}
+.history-stat-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.history-stat-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 52px;
+  font-weight: 200;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.history-stat-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #666;
+}
+
+/* ── WEEKLY CHART ── */
+#history-weekly-chart {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 28px 32px;
+  margin-bottom: 40px;
+}
+.chart-section-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #666;
+  margin-bottom: 28px;
+}
+.weekly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 220px;
+}
+.weekly-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+}
+.weekly-bar-fill {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.4s ease;
+}
+.weekly-bar-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  color: #555;
+  white-space: nowrap;
+}
+
+/* ── SESSIONS LIST ── */
+#history-sessions {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+.sessions-section-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #666;
+  margin-bottom: 20px;
+}
+.session-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 200px 100px;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid #222;
+  transition: background 0.2s;
+}
+.session-row:last-child { border-bottom: none; }
+.session-row:hover { background: rgba(255,255,255,0.02); margin: 0 -32px; padding-left: 32px; padding-right: 32px; }
+.session-date {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  color: #666;
+}
+.session-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 300;
+}
+.session-meta {
+  display: flex;
+  gap: 10px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  color: #666;
+}
+.session-cal { color: #FF3C00; }
+.session-badge {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  text-align: center;
+}
+.session-badge.complete {
+  background: rgba(94,232,192,0.1);
+  color: #5EE8C0;
+  border: 1px solid rgba(94,232,192,0.3);
+}
+.session-badge.partial {
+  background: rgba(255,255,255,0.05);
+  color: #666;
+  border: 1px solid #333;
+}
+.no-sessions {
+  font-size: 14px;
+  color: #555;
+  text-align: center;
+  padding: 48px 0;
+}

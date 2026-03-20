@@ -21,6 +21,11 @@ const io = new Server(server, {
 // Make io accessible to routes
 app.set('io', io)
 
+// Workout engine singleton
+const WorkoutEngine = require('./fitness/workout-engine')
+const workoutEngine = new WorkoutEngine(io)
+app.set('workoutEngine', workoutEngine)
+
 // Middleware
 app.use(cors())
 app.use(express.json())
@@ -32,6 +37,14 @@ app.use(express.static(path.join(__dirname, '../public')))
 // Companion app
 app.get('/companion', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/companion/index.html'))
+})
+
+// Fitness mode
+app.get('/fitness', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/fitness.html'))
+})
+app.get('/fitness/history', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/fitness-history.html'))
 })
 
 // Routes
@@ -51,9 +64,13 @@ app.use('/api/news',        require('./routes/news'))
 app.use('/api/spotify',     require('./routes/spotify'))
 app.use('/api/quote',       require('./routes/quote').router)
 app.use('/api/photos',      require('./routes/photos'))
+app.use('/api/fitness',     require('./routes/fitness'))
 
 // Serve uploaded photos as static files
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')))
+
+// Serve fitness GIFs as static files
+app.use('/data/gifs', express.static(path.join(__dirname, '../data/gifs')))
 
 // Spotify token endpoint for Web Playback SDK
 app.get('/spotify/token', async (req, res) => {

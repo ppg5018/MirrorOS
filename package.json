@@ -19,7 +19,8 @@
     "test:mic": "python3 scripts/test-mic.py",
     "test:voice": "bash scripts/test-voice.sh",
     "test:tts": "python3 server/voice/speak.py 'MirrorOS voice test'",
-    "setup:spotify": "node scripts/spotify-auth.js"
+    "setup:spotify": "node scripts/spotify-auth.js",
+    "setup:fitness": "node scripts/setup-fitness.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirrorOS — Workout History</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/fitness-history.css" />
+</head>
+<body>
+  <div id="history-app">
+
+    <!-- TOP BAR -->
+    <div id="history-top-bar">
+      <a href="/" class="history-back-btn">← MIRROR</a>
+      <div class="history-title">WORKOUT HISTORY</div>
+      <div></div>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="history-content">
+
+      <!-- Summary stats -->
+      <div id="history-stats-row"></div>
+
+      <!-- 8-week chart -->
+      <div id="history-weekly-chart">
+        <div class="chart-section-label">CALORIES BY WEEK — LAST 8 WEEKS</div>
+        <div id="weekly-bars" class="weekly-bars"></div>
+      </div>
+
+      <!-- Sessions list -->
+      <div id="history-sessions">
+        <div class="sessions-section-label">RECENT SESSIONS</div>
+        <div id="sessions-list"></div>
+      </div>
+
+    </div>
+  </div>
+  <script src="js/fitness-history.js"></script>
+</body>
+</html>

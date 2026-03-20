@@ -1,0 +1,95 @@
+{
+  "id": "core-crusher",
+  "name": "Core Crusher",
+  "category": "core",
+  "difficulty": "all levels",
+  "durationMinutes": 20,
+  "estimatedCalories": 180,
+  "description": "Targeted core workout for abs, obliques and lower back",
+  "exercises": [
+    {
+      "exerciseId": "1472",
+      "name": "Plank",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "glutes", "quads"],
+      "instructions": ["Place forearms on the ground with elbows under shoulders", "Extend legs back and rise onto your toes", "Keep body in a straight line from head to heels", "Hold position while breathing steadily"],
+      "sets": 3,
+      "reps": 45,
+      "restSeconds": 30,
+      "formTip": "Keep body in a straight line, squeeze glutes",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "0274",
+      "name": "Crunch",
+      "target": "abs",
+      "secondaryMuscles": ["obliques"],
+      "instructions": ["Lie on your back with knees bent and feet flat", "Place hands behind your head lightly", "Curl upper body toward your knees exhaling at the top", "Lower back down with control"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 30,
+      "formTip": "Curl up controlled, exhale at the top",
+      "metValue": 4.5
+    },
+    {
+      "exerciseId": "0502",
+      "name": "Lying Leg Raise",
+      "target": "abs",
+      "secondaryMuscles": ["hip flexors"],
+      "instructions": ["Lie flat on your back with legs straight", "Keep legs together and raise them toward the ceiling", "Lower legs slowly without touching the ground", "Keep lower back pressed firmly into the floor"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 30,
+      "formTip": "Keep lower back pressed into floor",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "2801",
+      "name": "Russian Twist",
+      "target": "obliques",
+      "secondaryMuscles": ["abs", "hip flexors"],
+      "instructions": ["Sit with knees bent and feet off the floor", "Lean back slightly keeping your spine straight", "Rotate your torso from side to side", "Keep movement controlled from the waist"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 30,
+      "formTip": "Rotate from the waist, keep feet off the ground",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "0586",
+      "name": "Mountain Climber",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "quads", "hip flexors"],
+      "instructions": ["Start in a high plank position", "Drive one knee toward your chest", "Alternate legs with quick controlled movements", "Keep hips level and core engaged throughout"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 30,
+      "formTip": "Keep hips level, drive knees to opposite elbow",
+      "metValue": 6.0
+    },
+    {
+      "exerciseId": "1468",
+      "name": "Bicycle Crunch",
+      "target": "abs",
+      "secondaryMuscles": ["obliques", "hip flexors"],
+      "instructions": ["Lie on your back with hands behind your head", "Bring opposite elbow to opposite knee", "Extend the other leg straight out", "Alternate sides in a pedaling motion"],
+      "sets": 3,
+      "reps": 30,
+      "restSeconds": 30,
+      "formTip": "Pedal motion, extend legs fully",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "0492",
+      "name": "Mountain Climber",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "quads", "hip flexors"],
+      "instructions": ["Start in high plank position with hands under shoulders", "Drive one knee toward your chest rapidly", "Alternate legs in a fast running motion", "Keep hips low and core engaged"],
+      "sets": 3,
+      "reps": 30,
+      "restSeconds": 20,
+      "formTip": "Hold plank, drive knees to chest fast",
+      "metValue": 7.0
+    }
+  ]
+}

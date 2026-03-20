@@ -1,0 +1,83 @@
+{
+  "id": "lower-body",
+  "name": "Lower Body Blast",
+  "category": "strength",
+  "difficulty": "beginner",
+  "durationMinutes": 25,
+  "estimatedCalories": 240,
+  "description": "Strengthen legs and glutes with compound movements",
+  "exercises": [
+    {
+      "exerciseId": "0032",
+      "name": "Bodyweight Squat",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "hamstrings"],
+      "instructions": ["Stand with feet shoulder-width apart", "Lower your body by bending knees and hips", "Keep chest up and core engaged", "Push through heels to return to standing"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 60,
+      "formTip": "Push through your heels, knees track over toes",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "1473",
+      "name": "Forward Lunge",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "hamstrings"],
+      "instructions": ["Stand tall with feet together", "Step forward with one leg", "Lower back knee toward the floor", "Push off front foot to return to standing"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Step forward, drop back knee to just above floor",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "3533",
+      "name": "Glute Bridge",
+      "target": "glutes",
+      "secondaryMuscles": ["hamstrings", "lower back"],
+      "instructions": ["Lie on your back with knees bent and feet flat", "Push hips up toward the ceiling", "Squeeze glutes hard at the top", "Lower back down slowly with control"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 60,
+      "formTip": "Squeeze glutes hard at the top, pause 1 second",
+      "metValue": 4.5
+    },
+    {
+      "exerciseId": "1604",
+      "name": "Romanian Deadlift",
+      "target": "hamstrings",
+      "secondaryMuscles": ["glutes", "lower back"],
+      "instructions": ["Stand holding dumbbells in front of thighs", "Hinge at hips pushing them backward", "Lower weights along your legs feeling the stretch", "Drive hips forward to return to standing"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "formTip": "Hinge at hips, keep back straight",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "1476",
+      "name": "Standing Calf Raise",
+      "target": "calves",
+      "secondaryMuscles": ["ankles"],
+      "instructions": ["Stand with feet hip-width apart near a wall for balance", "Rise up onto the balls of your feet", "Hold at the top briefly squeezing calves", "Lower back down slowly"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 45,
+      "formTip": "Rise up on toes, hold at the top briefly",
+      "metValue": 3.5
+    },
+    {
+      "exerciseId": "0685",
+      "name": "Jump Squat",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "calves", "hamstrings"],
+      "instructions": ["Stand with feet shoulder-width apart", "Lower into a squat position", "Explode upward jumping as high as possible", "Land softly and immediately lower into next rep"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 45,
+      "formTip": "Maintain good posture, step with control",
+      "metValue": 4.0
+    }
+  ]
+}

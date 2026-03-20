@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirrorOS — Fitness</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/fitness.css" />
+</head>
+
+<body>
+  <div id="fitness-app">
+
+    <!-- WORKOUT SELECTOR (shown when ?select=1 or no workout running) -->
+    <div id="workout-selector" style="display:none">
+      <div class="selector-title">CHOOSE YOUR WORKOUT</div>
+      <div id="selector-grid" class="selector-grid"></div>
+    </div>
+
+    <!-- TOP BAR -->
+    <div id="top-bar">
+      <div id="progress-dots-wrap">
+      <div id="progress-dots"></div>
+      <div id="completion-pct"></div>
+    </div>
+      <div id="top-center">
+        <div id="elapsed-time">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+          <span id="elapsed-text">0h 0m</span>
+        </div>
+        <div id="top-calories">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3C00" stroke-width="1.5"><path d="M12 2c0 6-8 10-8 16a8 8 0 0016 0c0-6-8-10-8-16z"/></svg>
+          <span id="top-cal-text">0 cal</span>
+        </div>
+      </div>
+      <button id="exit-btn">EXIT</button>
+    </div>
+
+    <!-- MAIN 3 COLUMNS -->
+    <div id="main-grid">
+
+      <!-- LEFT COLUMN -->
+      <div id="col-left">
+        <div id="exercise-name">Get Ready</div>
+        <div id="exercise-sets-reps">—</div>
+        <div id="current-set-label">CURRENT SET</div>
+        <div id="current-set-display">—</div>
+        <div id="timer-label">REST TIMER</div>
+        <div id="timer-display">0:00</div>
+        <div id="stats-grid">
+          <div class="stat-card" id="stat-weight">
+            <div class="stat-label">WEIGHT</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-card" id="stat-volume">
+            <div class="stat-label">VOLUME</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-card" id="stat-tempo">
+            <div class="stat-label">TEMPO</div>
+            <div class="stat-value">3-0-1-0</div>
+          </div>
+          <div class="stat-card" id="stat-rest">
+            <div class="stat-label">REST</div>
+            <div class="stat-value" id="rest-seconds">—</div>
+          </div>
+        </div>
+        <div id="form-tip-card">
+          <div id="form-tip-label">FORM TIP</div>
+          <div id="form-tip-text">Warming up...</div>
+        </div>
+      </div>
+
+      <!-- MIDDLE COLUMN -->
+      <div id="col-mid">
+        <div id="exercise-image-wrap">
+          <img id="exercise-image" src="" alt="">
+          <div id="active-badge">WARMUP</div>
+        </div>
+        <div id="instructions-label">STEP-BY-STEP INSTRUCTIONS</div>
+        <div id="instructions-list"></div>
+        <div id="muscles-label">TARGET MUSCLES</div>
+        <div id="muscles-list"></div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div id="col-right">
+        <div id="calories-card">
+          <div id="calories-label">CALORIES BURNED</div>
+          <div id="calories-display">
+            <span id="calories-value">0</span>
+            <span id="calories-unit">kcal</span>
+          </div>
+          <div id="calories-bar-wrap">
+            <div id="calories-bar-fill"></div>
+          </div>
+          <div id="calories-goal">Goal: 500 kcal</div>
+        </div>
+        <div id="up-next-card">
+          <div id="up-next-label">UP NEXT</div>
+          <div id="up-next-content">
+            <img id="up-next-image" src="" alt="">
+            <div id="up-next-info">
+              <div id="up-next-name"></div>
+              <div id="up-next-sets"></div>
+            </div>
+          </div>
+        </div>
+        <div id="progress-section">
+          <div id="progress-label">WORKOUT PROGRESS</div>
+          <div id="exercise-list"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottom-bar">
+      <button id="btn-pause" title="Pause">⏸</button>
+      <button id="btn-next-set">NEXT SET</button>
+      <button id="btn-next-exercise">NEXT EXERCISE</button>
+      <button id="btn-skip" title="Skip rest">⏭</button>
+    </div>
+
+  </div>
+
+    <!-- REST OVERLAY (shown during rest periods, overlays current screen) -->
+    <div id="rest-overlay" style="display:none">
+      <div class="rest-overlay-label">REST</div>
+      <div class="rest-overlay-timer-wrap">
+        <svg class="rest-progress-ring" viewBox="0 0 200 200">
+          <circle class="rest-ring-bg"   cx="100" cy="100" r="88"/>
+          <circle class="rest-ring-fill" cx="100" cy="100" r="88" id="rest-ring-fill"/>
+        </svg>
+        <div class="rest-overlay-countdown" id="rest-overlay-countdown">0</div>
+      </div>
+      <div class="rest-up-next">
+        <div class="rest-up-next-label">UP NEXT</div>
+        <img class="rest-up-next-img" id="rest-up-next-img" src="" alt="">
+        <div class="rest-up-next-name" id="rest-up-next-name">—</div>
+      </div>
+      <button class="rest-skip-btn" id="rest-skip-btn">SKIP REST</button>
+    </div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/fitness-ui.js"></script>
+</body>
+
+</html>

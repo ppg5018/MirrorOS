@@ -1,0 +1,131 @@
+{
+  "id": "full-body-burn",
+  "name": "Full Body Burn",
+  "category": "strength",
+  "difficulty": "advanced",
+  "durationMinutes": 40,
+  "estimatedCalories": 450,
+  "description": "Advanced full body session combining strength and cardio",
+  "exercises": [
+    {
+      "exerciseId": "0307",
+      "name": "Burpee",
+      "target": "full body",
+      "secondaryMuscles": ["chest", "quads", "core"],
+      "instructions": ["Stand tall then squat down and place hands on floor", "Jump feet back into plank position", "Perform a push-up at the bottom", "Jump feet forward and explode upward"],
+      "sets": 4,
+      "reps": 10,
+      "restSeconds": 30,
+      "formTip": "Full burpee with push-up at the bottom",
+      "metValue": 8.0
+    },
+    {
+      "exerciseId": "0032",
+      "name": "Bodyweight Squat",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "hamstrings"],
+      "instructions": ["Stand with feet shoulder-width apart", "Lower your body by bending knees and hips", "Keep chest up and core engaged", "Push through heels to return to standing"],
+      "sets": 4,
+      "reps": 15,
+      "restSeconds": 45,
+      "formTip": "Deep squat, chest up, drive through heels",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "0662",
+      "name": "Push Up",
+      "target": "chest",
+      "secondaryMuscles": ["triceps", "shoulders", "core"],
+      "instructions": ["Start in high plank with hands shoulder-width apart", "Lower your chest toward the floor", "Push back up to starting position explosively", "Keep body in a straight line throughout"],
+      "sets": 4,
+      "reps": 15,
+      "restSeconds": 45,
+      "formTip": "Chest to floor, explosive push",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "1473",
+      "name": "Forward Lunge",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "hamstrings"],
+      "instructions": ["Stand tall with feet together", "Step forward with one leg", "Lower back knee toward the floor", "Push off front foot to return to standing"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 45,
+      "formTip": "Alternate legs, keep torso upright",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "0294",
+      "name": "Dumbbell Shoulder Press",
+      "target": "shoulders",
+      "secondaryMuscles": ["triceps", "upper chest"],
+      "instructions": ["Hold dumbbells at shoulder height", "Press weights overhead until arms fully extend", "Lower back to shoulder height with control", "Keep core braced throughout the movement"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 45,
+      "formTip": "Control the press, full lockout at top",
+      "metValue": 5.5
+    },
+    {
+      "exerciseId": "1604",
+      "name": "Romanian Deadlift",
+      "target": "hamstrings",
+      "secondaryMuscles": ["glutes", "lower back"],
+      "instructions": ["Stand holding dumbbells in front of thighs", "Hinge at hips pushing them backward", "Lower weights along your legs feeling the stretch", "Drive hips forward to return to standing"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 45,
+      "formTip": "Hinge at hips, feel the stretch in hamstrings",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "0586",
+      "name": "Mountain Climber",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "quads", "hip flexors"],
+      "instructions": ["Start in a high plank position", "Drive one knee toward your chest", "Alternate legs with quick controlled movements", "Keep hips level and core engaged throughout"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 30,
+      "formTip": "Fast pace, keep hips low",
+      "metValue": 7.0
+    },
+    {
+      "exerciseId": "3533",
+      "name": "Glute Bridge",
+      "target": "glutes",
+      "secondaryMuscles": ["hamstrings", "lower back"],
+      "instructions": ["Lie on your back with knees bent and feet flat", "Push hips up toward the ceiling", "Squeeze glutes hard at the top", "Lower back down slowly with control"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 45,
+      "formTip": "Squeeze at top, lower slowly",
+      "metValue": 4.5
+    },
+    {
+      "exerciseId": "1472",
+      "name": "Plank",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "glutes", "quads"],
+      "instructions": ["Place forearms on the ground with elbows under shoulders", "Extend legs back and rise onto your toes", "Keep body in a straight line from head to heels", "Hold position while breathing steadily"],
+      "sets": 3,
+      "reps": 60,
+      "restSeconds": 30,
+      "formTip": "Hold strong, breathe steadily",
+      "metValue": 5.0
+    },
+    {
+      "exerciseId": "3220",
+      "name": "Jumping Jack",
+      "target": "full body",
+      "secondaryMuscles": ["shoulders", "calves", "core"],
+      "instructions": ["Stand with feet together and arms at sides", "Jump feet apart while raising arms overhead", "Jump back to starting position", "Maintain a steady rhythm throughout"],
+      "sets": 3,
+      "reps": 30,
+      "restSeconds": 20,
+      "formTip": "Full arm extension overhead on each jump",
+      "metValue": 7.0
+    }
+  ]
+}

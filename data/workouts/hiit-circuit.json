@@ -1,0 +1,107 @@
+{
+  "id": "hiit-circuit",
+  "name": "HIIT Circuit",
+  "category": "hiit",
+  "difficulty": "intermediate",
+  "durationMinutes": 25,
+  "estimatedCalories": 350,
+  "description": "High intensity full body circuit with minimal rest",
+  "exercises": [
+    {
+      "exerciseId": "0307",
+      "name": "Burpee",
+      "target": "full body",
+      "secondaryMuscles": ["chest", "quads", "core"],
+      "instructions": ["Stand tall then squat down and place hands on floor", "Jump feet back into plank position", "Perform a push-up at the bottom", "Jump feet forward and explode upward"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 30,
+      "formTip": "Keep your core tight, land softly on each rep",
+      "metValue": 8.0
+    },
+    {
+      "exerciseId": "3220",
+      "name": "Jumping Jack",
+      "target": "full body",
+      "secondaryMuscles": ["shoulders", "calves", "core"],
+      "instructions": ["Stand with feet together and arms at sides", "Jump feet apart while raising arms overhead", "Jump back to starting position", "Maintain a steady rhythm throughout"],
+      "sets": 3,
+      "reps": 30,
+      "restSeconds": 20,
+      "formTip": "Arms fully extended on each jump",
+      "metValue": 7.0
+    },
+    {
+      "exerciseId": "0652",
+      "name": "High Knees",
+      "target": "quads",
+      "secondaryMuscles": ["hip flexors", "calves", "core"],
+      "instructions": ["Stand tall with feet hip-width apart", "Drive one knee up toward your chest", "Alternate legs rapidly in a running motion", "Pump arms in sync with your legs"],
+      "sets": 3,
+      "reps": 15,
+      "restSeconds": 30,
+      "formTip": "Drive knees up to waist height",
+      "metValue": 8.5
+    },
+    {
+      "exerciseId": "0586",
+      "name": "Mountain Climber",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "quads", "hip flexors"],
+      "instructions": ["Start in a high plank position", "Drive one knee toward your chest", "Alternate legs with quick controlled movements", "Keep hips level and core engaged throughout"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 20,
+      "formTip": "Keep your hips level throughout",
+      "metValue": 8.0
+    },
+    {
+      "exerciseId": "3294",
+      "name": "Squat Jump",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "calves", "core"],
+      "instructions": ["Stand with feet shoulder-width apart", "Lower into a deep squat position", "Explode upward into a jump", "Land softly and immediately lower into next rep"],
+      "sets": 3,
+      "reps": 10,
+      "restSeconds": 30,
+      "formTip": "Full depth on the squat before the jump",
+      "metValue": 8.5
+    },
+    {
+      "exerciseId": "0662",
+      "name": "Push Up",
+      "target": "chest",
+      "secondaryMuscles": ["triceps", "shoulders", "core"],
+      "instructions": ["Start in high plank with hands shoulder-width apart", "Lower your chest toward the floor", "Push back up to starting position explosively", "Keep body in a straight line throughout"],
+      "sets": 3,
+      "reps": 20,
+      "restSeconds": 20,
+      "formTip": "Fast feet, stay on your toes",
+      "metValue": 7.0
+    },
+    {
+      "exerciseId": "1472",
+      "name": "Plank",
+      "target": "core",
+      "secondaryMuscles": ["shoulders", "glutes", "quads"],
+      "instructions": ["Place forearms on the ground with elbows under shoulders", "Extend legs back and rise onto your toes", "Keep body in a straight line from head to heels", "Hold position while breathing steadily"],
+      "sets": 3,
+      "reps": 45,
+      "restSeconds": 30,
+      "formTip": "Hold a strong plank position, do not sag",
+      "metValue": 6.0
+    },
+    {
+      "exerciseId": "0685",
+      "name": "Jump Squat",
+      "target": "quads",
+      "secondaryMuscles": ["glutes", "calves", "hamstrings"],
+      "instructions": ["Stand with feet shoulder-width apart", "Lower into a squat position", "Explode upward jumping as high as possible", "Land softly and immediately lower into next rep"],
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 30,
+      "formTip": "Explode up, control the landing",
+      "metValue": 9.0
+    }
+  ]
+}

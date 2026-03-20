@@ -51,7 +51,19 @@ SLIDESHOW RULES:
 QUOTE RULES:
 - When user says "give me a quote", "new quote", "inspire me", "motivate me", or "read me the quote" → use get_quote tool.
 - refresh: true generates a brand new quote.
-- refresh: false reads the current one aloud.`
+- refresh: false reads the current one aloud.
+
+FITNESS RULES:
+- "start a workout" / "let's work out" / "begin exercise"     → fitness_control action: list_workouts (show options first)
+- "start [workout name]" / "start HIIT" / "do the quickie"    → fitness_control action: start, workoutId=matching-id
+- "pause workout" / "hold on"                                  → fitness_control action: pause
+- "resume workout" / "continue" / "keep going"                 → fitness_control action: resume
+- "skip exercise" / "next exercise"                            → fitness_control action: skip
+- "stop workout" / "end workout" / "I'm done"                  → fitness_control action: stop
+- "workout status" / "how am I doing" / "how many calories"    → fitness_control action: status
+- "show me workouts" / "what workouts do you have"             → fitness_control action: list_workouts
+- Workout IDs: hiit-circuit, upper-body, lower-body, core-crusher, full-body-burn, morning-yoga, stretching, 5-minute-quickie
+- Default weight is 70kg. Only ask for weight if user mentions it.`
 
 // ── Conversation memory ──────────────────────────────────────
 const MAX_EXCHANGES = 5
@@ -136,7 +148,8 @@ const TOOL_TO_WIDGET = {
   get_news:              'ai-bar',
   set_reminder:          'ai-bar',
   get_quote:             'quote',
-  control_slideshow:     null
+  control_slideshow:     null,
+  fitness_control:       'fitness'
 }
 
 const tools = [
@@ -310,6 +323,22 @@ const tools = [
           type: 'string',
           description: "Search term, history keyword, or channel name depending on action. e.g. 'lo-fi hip hop', 'Kesariya', 'Tanmay Bhat'"
         }
+      },
+      required: ['action']
+    }
+  },
+  {
+    name: 'fitness_control',
+    description: 'Control fitness workouts — start, pause, resume, skip, stop, or check status',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['start', 'pause', 'resume', 'skip', 'stop', 'status', 'list_workouts']
+        },
+        workoutId: { type: 'string', description: 'Workout ID for start action (e.g. hiit-circuit, 5-minute-quickie)' },
+        weightKg: { type: 'number', description: 'User weight in kg for calorie calculation' }
       },
       required: ['action']
     }

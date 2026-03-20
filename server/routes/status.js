@@ -23,6 +23,24 @@ router.get('/', (req, res) => {
     } catch (e) { /* token unreadable */ }
   }
 
+  // Fitness data status
+  let fitnessStatus = { setupComplete: false, exercisesLoaded: 0, workoutsAvailable: 0 }
+  try {
+    const exercisesPath = path.join(__dirname, '../../data/exercises.json')
+    const workoutsDir   = path.join(__dirname, '../../data/workouts')
+    const exercisesLoaded = fs.existsSync(exercisesPath)
+      ? JSON.parse(fs.readFileSync(exercisesPath, 'utf8')).length
+      : 0
+    const workoutsAvailable = fs.existsSync(workoutsDir)
+      ? fs.readdirSync(workoutsDir).filter(f => f.endsWith('.json')).length
+      : 0
+    fitnessStatus = {
+      setupComplete: exercisesLoaded > 100,
+      exercisesLoaded,
+      workoutsAvailable
+    }
+  } catch (e) { /* non-fatal */ }
+
   res.json({
     uptime:      process.uptime(),
     memory:      process.memoryUsage(),
@@ -30,6 +48,7 @@ router.get('/', (req, res) => {
     timestamp:   new Date().toISOString(),
     status:      'online',
     nextBriefing: getNextBriefingTime(),
+    fitness:     fitnessStatus,
     integrations: {
       google:   { connected: googleConnected,  source: 'google_oauth' },
       youtube:  { connected: youtubeConnected, source: 'google_oauth' },

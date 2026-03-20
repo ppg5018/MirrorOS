@@ -2,14 +2,23 @@
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --font-family-base: 'Inter', sans-serif;
+  --font-family-display: 'Space Grotesk', sans-serif;
+  --background: #000000;
+  --foreground: #ffffff;
+  --teal-accent: #5EE8C0;
+  --red-active: #FF3C00;
+  --gray-800: #1a1a1a;
+  --gray-700: #2a2a2a;
+  --gray-600: #3a3a3a;
+  --gray-500: #666666;
+  --gray-400: #999999;
+  --card: #000000;
+  --card-foreground: #ffffff;
+  --popover: #000000;
+  --popover-foreground: #ffffff;
   --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
   --muted: #ececf0;
@@ -125,7 +134,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[#000000] text-white;
+    font-family: var(--font-family-base);
   }
 
   /**

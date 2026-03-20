@@ -1,446 +1,471 @@
 import { useState, useEffect } from 'react';
-import { ClockWidget } from './components/ClockWidget';
-import { WeatherWidget } from './components/WeatherWidget';
-import { AIPanel, MirrorState } from './components/AIPanel';
-import { NotificationsWidget } from './components/NotificationsWidget';
-import { CalendarWidget } from './components/CalendarWidget';
-import { SpotifyWidget } from './components/SpotifyWidget';
-import { WallpaperSection } from './components/WallpaperSection';
-import { TasksWidget } from './components/TasksWidget';
-import { ScanLine } from './components/ScanLine';
-import '../styles/mirrorOS.css';
-import '../styles/fonts.css';
+import { Play, Pause, SkipForward, Flame, Clock, Dumbbell, TrendingUp, Zap, Target } from 'lucide-react';
 
-/* ─── Quotes rotation ─── */
-const QUOTES = [
-  { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
-  { text: "Arise, awake, and stop not till the goal is reached.", author: "Swami Vivekananda" },
-  { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
-  { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde" },
-  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+interface Exercise {
+  id: number;
+  name: string;
+  sets: number;
+  reps: string;
+  restTime: number;
+  image: string;
+  instructions: string[];
+  muscles: string[];
+  formTip: string;
+}
+
+const workoutData: Exercise[] = [
+  {
+    id: 1,
+    name: 'Barbell Back Squat',
+    sets: 4,
+    reps: '8-10',
+    restTime: 120,
+    image: 'https://images.unsplash.com/photo-1770026136877-8ddf98cd6500?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXJiZWxsJTIwc3F1YXQlMjBneW0lMjBleGVyY2lzZXxlbnwxfHx8fDE3NzM5OTEzNTB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    instructions: [
+      'Stand with feet shoulder-width apart, barbell on upper back',
+      'Keep chest up, core tight, eyes forward throughout movement',
+      'Lower by pushing hips back and bending knees simultaneously',
+      'Descend until thighs are parallel to ground or lower',
+      'Drive through heels to return to starting position'
+    ],
+    muscles: ['Quads', 'Glutes', 'Core', 'Hamstrings'],
+    formTip: 'Keep your knees tracking over your toes. Don\'t let them cave inward.'
+  },
+  {
+    id: 2,
+    name: 'Romanian Deadlift',
+    sets: 3,
+    reps: '10-12',
+    restTime: 90,
+    image: 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWFkbGlmdCUyMGd5bSUyMGV4ZXJjaXNlfGVufDF8fHx8MTc3Mzk5MTM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+    instructions: [
+      'Hold barbell at hip level with overhand grip',
+      'Keep slight bend in knees, shoulders back',
+      'Hinge at hips, pushing them back while lowering bar',
+      'Lower until you feel stretch in hamstrings',
+      'Drive hips forward to return to start'
+    ],
+    muscles: ['Hamstrings', 'Glutes', 'Lower Back'],
+    formTip: 'Maintain a neutral spine. The bar should travel close to your legs.'
+  },
+  {
+    id: 3,
+    name: 'Overhead Press',
+    sets: 4,
+    reps: '6-8',
+    restTime: 120,
+    image: 'https://images.unsplash.com/photo-1772450014048-ec6dc611be2b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvdmVyaGVhZCUyMHByZXNzJTIwZ3ltfGVufDF8fHx8MTc3Mzk5MTM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+    instructions: [
+      'Stand with feet hip-width, bar at shoulder height',
+      'Grip bar just outside shoulders, elbows slightly forward',
+      'Brace core and press bar straight overhead',
+      'Lock out arms at top, bar over mid-foot',
+      'Lower with control back to shoulders'
+    ],
+    muscles: ['Shoulders', 'Triceps', 'Upper Chest', 'Core'],
+    formTip: 'Press the bar in a straight line. Move your head back slightly to avoid hitting it.'
+  },
+  {
+    id: 4,
+    name: 'Weighted Pull-Ups',
+    sets: 3,
+    reps: '6-8',
+    restTime: 150,
+    image: 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWFkbGlmdCUyMGd5bSUyMGV4ZXJjaXNlfGVufDF8fHx8MTc3Mzk5MTM1MHww&ixlib=rb-4.1.0&q=80&w=1080',
+    instructions: [
+      'Hang from bar with palms facing away, shoulder-width grip',
+      'Engage lats and pull shoulder blades down and back',
+      'Pull body up until chin clears the bar',
+      'Hold briefly at top position',
+      'Lower with control to full hang'
+    ],
+    muscles: ['Lats', 'Biceps', 'Upper Back'],
+    formTip: 'Avoid swinging. Control the movement both up and down.'
+  },
+  {
+    id: 5,
+    name: 'Dumbbell Lunges',
+    sets: 3,
+    reps: '10 each',
+    restTime: 90,
+    image: 'https://images.unsplash.com/photo-1770026136877-8ddf98cd6500?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXJiZWxsJTIwc3F1YXQlMjBneW0lMjBleGVyY2lzZXxlbnwxfHx8fDE3NzM5OTEzNTB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    instructions: [
+      'Hold dumbbells at sides, stand tall',
+      'Step forward with one leg, lowering hips',
+      'Drop back knee toward floor, front thigh parallel',
+      'Push through front heel to return to start',
+      'Alternate legs for each rep'
+    ],
+    muscles: ['Quads', 'Glutes', 'Hamstrings'],
+    formTip: 'Keep your torso upright. Don\'t let your front knee go past your toes.'
+  }
 ];
 
-/* ─── News items ─── */
-const NEWS_ITEMS = [
-  { source: "Times of India", headline: "India's GDP growth forecast revised upward to 7.2% for FY26 amid strong manufacturing output", time: "12m ago" },
-  { source: "The Hindu", headline: "ISRO successfully tests Gaganyaan life support module ahead of crewed mission", time: "35m ago" },
-  { source: "Mint", headline: "Sensex crosses 80,000 mark again as foreign investors increase stakes in Indian equities", time: "1h ago" },
-];
-
-/* ─── MirrorOS brand mark ─── */
-function BrandMark() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ position: 'relative', width: 24, height: 24 }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          borderRadius: '50%',
-          border: '1px solid rgba(0,212,255,0.45)',
-        }} />
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%,-50%)',
-          width: 5.5, height: 5.5,
-          borderRadius: '50%',
-          background: '#00D4FF',
-          opacity: 0.85,
-        }} />
-      </div>
-      <span style={{
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 11,
-        fontWeight: 300,
-        letterSpacing: '5px',
-        color: 'rgba(255,255,255,0.72)',
-        textTransform: 'uppercase',
-      }}>
-        MirrorOS
-      </span>
-    </div>
-  );
-}
-
-/* ─── Inline Quote (compact, for top bar) ─── */
-function TopQuote() {
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-
+function App() {
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentSet, setCurrentSet] = useState(1);
+  const [timer, setTimer] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [totalCalories, setTotalCalories] = useState(284);
+  const [elapsedTime, setElapsedTime] = useState(1845); // in seconds
+  
+  const currentExercise = workoutData[currentExerciseIndex];
+  
   useEffect(() => {
-    const t = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx(i => (i + 1) % QUOTES.length);
-        setVisible(true);
-      }, 600);
-    }, 12000);
-    return () => clearInterval(t);
-  }, []);
-
-  const q = QUOTES[idx];
-
+    const interval = setInterval(() => {
+      if (!isPaused) {
+        setTimer(prev => prev + 1);
+        setElapsedTime(prev => prev + 1);
+        // Simulate calorie burn (roughly 5 calories per minute)
+        if (timer % 12 === 0) {
+          setTotalCalories(prev => prev + 1);
+        }
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isPaused, timer]);
+  
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const formatElapsedTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${mins}m`;
+  };
+  
+  const handleNext = () => {
+    if (currentSet < currentExercise.sets) {
+      setCurrentSet(prev => prev + 1);
+      setTimer(0);
+    } else if (currentExerciseIndex < workoutData.length - 1) {
+      setCurrentExerciseIndex(prev => prev + 1);
+      setCurrentSet(1);
+      setTimer(0);
+    }
+  };
+  
+  const handleSkip = () => {
+    if (currentExerciseIndex < workoutData.length - 1) {
+      setCurrentExerciseIndex(prev => prev + 1);
+      setCurrentSet(1);
+      setTimer(0);
+    }
+  };
+  
+  const handleNextExercise = () => {
+    if (currentExerciseIndex < workoutData.length - 1) {
+      setCurrentExerciseIndex(prev => prev + 1);
+      setCurrentSet(1);
+      setTimer(0);
+    }
+  };
+  
+  const progressPercentage = ((currentExerciseIndex) / workoutData.length) * 100;
+  
   return (
-    <div style={{
-      flex: 1,
-      textAlign: 'center',
-      padding: '0 60px',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.5s ease',
-    }}>
-      <span style={{
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 13,
-        fontWeight: 300,
-        color: 'rgba(255,255,255,0.85)',
-        letterSpacing: '0.2px',
-        fontStyle: 'italic',
-      }}>
-        "{q.text}"
-      </span>
-      <span style={{
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 11,
-        fontWeight: 300,
-        color: 'rgba(0,212,255,0.90)',
-        letterSpacing: '1.5px',
-        marginLeft: 12,
-      }}>
-        — {q.author}
-      </span>
-    </div>
-  );
-}
-
-/* ─── Bottom News Bar ─── */
-function NewsBar() {
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx(i => (i + 1) % NEWS_ITEMS.length);
-        setVisible(true);
-      }, 500);
-    }, 9000);
-    return () => clearInterval(t);
-  }, []);
-
-  const news = NEWS_ITEMS[idx];
-
-  return (
-    <div style={{
-      position: 'absolute',
-      bottom: 0, left: 0, right: 0,
-      height: 52,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 0,
-      borderTop: '1px solid rgba(255,255,255,0.06)',
-      padding: '0 60px',
-    }}>
-      {/* NEWS label */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
-        marginRight: 28,
-      }}>
-        <div style={{
-          width: 3, height: 14,
-          background: 'rgba(0,212,255,0.70)',
-          borderRadius: 2,
-        }} />
-        <span style={{
-          fontFamily: "'Inter', sans-serif",
-          fontSize: 9,
-          fontWeight: 400,
-          letterSpacing: '3px',
-          color: 'rgba(0,212,255,0.65)',
-          textTransform: 'uppercase',
-        }}>
-          News
-        </span>
-      </div>
-
-      {/* Source badge */}
-      <div style={{
-        flexShrink: 0,
-        padding: '2px 10px',
-        border: '1px solid rgba(255,255,255,0.20)',
-        borderRadius: 10,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 9,
-        fontWeight: 300,
-        color: 'rgba(255,255,255,0.68)',
-        letterSpacing: '1px',
-        marginRight: 16,
-      }}>
-        {news.source}
-      </div>
-
-      {/* Headline */}
-      <div style={{
-        flex: 1,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 12,
-        fontWeight: 300,
-        color: 'rgba(255,255,255,0.90)',
-        letterSpacing: '0.2px',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.45s ease',
-      }}>
-        {news.headline}
-      </div>
-
-      {/* Time */}
-      <div style={{
-        flexShrink: 0,
-        marginLeft: 20,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 10,
-        fontWeight: 300,
-        color: 'rgba(255,255,255,0.58)',
-        letterSpacing: '1px',
-      }}>
-        {news.time}
-      </div>
-
-      {/* Dot nav */}
-      <div style={{ display: 'flex', gap: 5, marginLeft: 16, flexShrink: 0 }}>
-        {NEWS_ITEMS.map((_, i) => (
-          <div key={i} style={{
-            width: i === idx ? 10 : 3,
-            height: 3,
-            borderRadius: 2,
-            background: i === idx ? 'rgba(0,212,255,0.60)' : 'rgba(255,255,255,0.12)',
-            transition: 'all 0.4s ease',
-          }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Thin vertical column divider ─── */
-function ColDivider() {
-  return (
-    <div style={{
-      width: 1,
-      alignSelf: 'stretch',
-      background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.07) 20%, rgba(255,255,255,0.07) 80%, transparent 100%)',
-      flexShrink: 0,
-    }} />
-  );
-}
-
-/* ─── Ambient glow blobs ─── */
-function AmbientGlows() {
-  return (
-    <>
-      <div style={{
-        position: 'absolute', top: 0, left: 0,
-        width: 600, height: 400,
-        background: 'radial-gradient(ellipse at top left, rgba(0,212,255,0.015) 0%, transparent 60%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', top: 0, right: 0,
-        width: 800, height: 500,
-        background: 'radial-gradient(ellipse at top right, rgba(0,212,255,0.022) 0%, transparent 65%)',
-        pointerEvents: 'none',
-      }} />
-    </>
-  );
-}
-
-/* ─── Main App ─── */
-export default function App() {
-  const [mirrorState] = useState<MirrorState>('idle');
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const updateScale = () => {
-      const sx = window.innerWidth / 1920;
-      const sy = window.innerHeight / 1080;
-      setScale(Math.min(sx, sy));
-    };
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, []);
-
-  const widgetOpacity =
-    mirrorState === 'listening'  ? 0.25 :
-    mirrorState === 'responding' ? 0.55 :
-    1;
-
-  return (
-    <div style={{
-      width: '100vw', height: '100vh',
-      background: '#000',
-      overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
-      {/* ── 1920×1080 Canvas ── */}
-      <div style={{
-        width: 1920,
-        height: 1080,
-        background: '#000000',
-        position: 'relative',
-        fontFamily: "'Inter', sans-serif",
-        transform: `scale(${scale})`,
-        transformOrigin: 'center center',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}>
-
-        <AmbientGlows />
-        {mirrorState === 'idle' && <ScanLine />}
-
-        {/* ════════════════════════════════════════════
-            TOP BAR — brand + quote
-        ════════════════════════════════════════════ */}
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0,
-          height: 66,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 60px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-        }}>
-          <BrandMark />
-          <TopQuote />
-          {/* Right: live clock micro indicator */}
-          <div style={{
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontFamily: "'Inter', sans-serif",
-            fontSize: 11,
-            fontWeight: 300,
-            color: 'rgba(255,255,255,0.20)',
-            letterSpacing: '1.5px',
-          }}>
-            <span style={{
-              width: 5, height: 5,
-              borderRadius: '50%',
-              background: '#00FF88',
-              opacity: 0.85,
-              boxShadow: '0 0 4px rgba(0,255,136,0.5)',
-            }} />
-            Live
+    <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden">
+      <div className="bg-black text-white flex flex-col overflow-hidden" style={{ width: '1920px', height: '1080px', fontFamily: 'Inter, sans-serif' }}>
+      {/* Top Bar */}
+      <div className="h-20 flex-shrink-0 border-b border-[#2a2a2a] flex items-center justify-between px-8">
+        <div className="flex items-center gap-3">
+          {workoutData.map((_, index) => (
+            <div 
+              key={index}
+              className={`w-3 h-3 rounded-full ${
+                index === currentExerciseIndex 
+                  ? 'bg-[#FF3C00]' 
+                  : index < currentExerciseIndex 
+                    ? 'bg-[#5EE8C0]' 
+                    : 'bg-[#3a3a3a]'
+              }`}
+            />
+          ))}
+        </div>
+        
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-[#5EE8C0]" />
+            <span className="text-xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              {formatElapsedTime(elapsedTime)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Flame className="w-5 h-5 text-[#FF3C00]" />
+            <span className="text-xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              {totalCalories} cal
+            </span>
           </div>
         </div>
-
-        {/* ════════════════════════════════════════════
-            MAIN 3-COLUMN GRID
-        ════════════════════════════════════════════ */}
-        <div style={{
-          position: 'absolute',
-          top: 66, left: 0, right: 0, bottom: 52,
-          display: 'flex',
-          padding: '0 60px',
-        }}>
-
-          {/* ── COL 1: Clock + Weather ── */}
-          <div
-            className="mirror-widget"
-            style={{
-              width: 460,
-              flexShrink: 0,
-              paddingTop: 48,
-              paddingRight: 52,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 44,
-              opacity: widgetOpacity,
-            }}
-          >
-            <ClockWidget />
-            <WeatherWidget />
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '-12px 0' }} />
-            <TasksWidget />
+      </div>
+      
+      {/* Main Content - 3 Columns */}
+      <div className="flex-1 grid grid-cols-3 gap-0 overflow-hidden">
+        {/* Left Column */}
+        <div className="border-r border-[#2a2a2a] p-8 flex flex-col overflow-hidden">
+          <div className="mb-8">
+            <h1 className="text-3xl mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              {currentExercise.name}
+            </h1>
+            <p className="text-[#999999]">
+              {currentExercise.sets} sets × {currentExercise.reps} reps
+            </p>
           </div>
-
-          <ColDivider />
-
-          {/* ── COL 2: AI Panel + Calendar ── */}
-          <div style={{
-            flex: 1,
-            paddingTop: 48,
-            paddingLeft: 56,
-            paddingRight: 56,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 36,
-            minWidth: 0,
-            overflowY: 'hidden',
-          }}>
-            {/* AI always full opacity */}
-            <AIPanel state={mirrorState} />
-
-            <div
-              className="mirror-widget"
-              style={{ opacity: widgetOpacity, paddingLeft: 20 }}
-            >
-              <CalendarWidget />
+          
+          <div className="mb-8">
+            <div className="text-sm text-[#999999] mb-2">CURRENT SET</div>
+            <div className="text-6xl" style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#5EE8C0' }}>
+              {currentSet}/{currentExercise.sets}
             </div>
           </div>
-
-          <ColDivider />
-
-          {/* ── COL 3: Notifications + Spotify + Wallpaper ── */}
-          <div
-            className="mirror-widget"
-            style={{
-              width: 490,
-              flexShrink: 0,
-              paddingTop: 48,
-              paddingLeft: 50,
-              paddingBottom: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 32,
-              opacity: widgetOpacity,
-              overflowY: 'hidden',
-            }}
-          >
-            <NotificationsWidget />
-
-            <div style={{
-              height: 1,
-              background: 'rgba(255,255,255,0.06)',
-              margin: '-8px 0',
-            }} />
-
-            <SpotifyWidget />
-
-            <div style={{
-              height: 1,
-              background: 'rgba(255,255,255,0.06)',
-              margin: '-8px 0',
-            }} />
-
-            <WallpaperSection />
+          
+          <div className="mb-8">
+            <div className="text-sm text-[#999999] mb-2">REST TIMER</div>
+            <div className="text-8xl" style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#FF3C00' }}>
+              {formatTime(timer)}
+            </div>
           </div>
-
+          
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="bg-[#1a1a1a] p-4 rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center gap-2 mb-2">
+                <Dumbbell className="w-4 h-4 text-[#5EE8C0]" />
+                <span className="text-xs text-[#999999]">WEIGHT</span>
+              </div>
+              <div className="text-2xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>225 lb</div>
+            </div>
+            
+            <div className="bg-[#1a1a1a] p-4 rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-[#5EE8C0]" />
+                <span className="text-xs text-[#999999]">VOLUME</span>
+              </div>
+              <div className="text-2xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>7,200 lb</div>
+            </div>
+            
+            <div className="bg-[#1a1a1a] p-4 rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-[#5EE8C0]" />
+                <span className="text-xs text-[#999999]">TEMPO</span>
+              </div>
+              <div className="text-2xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>3-0-1-0</div>
+            </div>
+            
+            <div className="bg-[#1a1a1a] p-4 rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-[#5EE8C0]" />
+                <span className="text-xs text-[#999999]">REST</span>
+              </div>
+              <div className="text-2xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>{currentExercise.restTime}s</div>
+            </div>
+          </div>
+          
+          <div className="mt-auto bg-[#1a1a1a] p-6 rounded-lg border border-[#5EE8C0]">
+            <div className="text-xs text-[#5EE8C0] mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              FORM TIP
+            </div>
+            <p className="text-sm text-white">
+              {currentExercise.formTip}
+            </p>
+          </div>
         </div>
-
-        {/* ════════════════════════════════════════════
-            BOTTOM BAR — News
-        ════════════════════════════════════════════ */}
-        <NewsBar />
-
+        
+        {/* Middle Column */}
+        <div className="border-r border-[#2a2a2a] p-8 flex flex-col overflow-hidden">
+          <div className="relative mb-6 rounded-lg overflow-hidden flex-shrink-0" style={{ height: '340px' }}>
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black z-10" style={{ opacity: 0.7 }}></div>
+            <img 
+              src={currentExercise.image} 
+              alt={currentExercise.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-4 right-4 z-20 bg-[#FF3C00] px-4 py-2 rounded-full">
+              <span style={{ fontFamily: 'Space Grotesk, sans-serif' }}>ACTIVE</span>
+            </div>
+          </div>
+          
+          <div className="mb-6 flex-1 overflow-hidden">
+            <h3 className="text-sm text-[#999999] mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              STEP-BY-STEP INSTRUCTIONS
+            </h3>
+            <div className="space-y-3">
+              {currentExercise.instructions.map((instruction, index) => (
+                <div key={index} className="flex gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#5EE8C0] text-black flex items-center justify-center" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                    {index + 1}
+                  </div>
+                  <p className="text-sm text-[#cccccc] flex-1 pt-1">
+                    {instruction}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex-shrink-0">
+            <div className="text-xs text-[#999999] mb-3" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              TARGET MUSCLES
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {currentExercise.muscles.map((muscle, index) => (
+                <div 
+                  key={index}
+                  className="px-4 py-2 bg-[#1a1a1a] border border-[#5EE8C0] rounded-full text-sm"
+                  style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#5EE8C0' }}
+                >
+                  {muscle}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Column */}
+        <div className="p-8 flex flex-col overflow-hidden">
+          <div className="bg-[#1a1a1a] p-6 rounded-lg border border-[#2a2a2a] mb-6">
+            <div className="text-sm text-[#999999] mb-2">CALORIES BURNED</div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-5xl" style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#FF3C00' }}>
+                {totalCalories}
+              </span>
+              <span className="text-xl text-[#999999]">kcal</span>
+            </div>
+            <div className="mt-4 h-2 bg-[#2a2a2a] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[#FF3C00] rounded-full transition-all"
+                style={{ width: `${(totalCalories / 500) * 100}%` }}
+              />
+            </div>
+            <div className="text-xs text-[#999999] mt-2">Goal: 500 kcal</div>
+          </div>
+          
+          {currentExerciseIndex < workoutData.length - 1 && (
+            <div className="bg-[#1a1a1a] p-6 rounded-lg border border-[#2a2a2a] mb-6">
+              <div className="text-sm text-[#999999] mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                UP NEXT
+              </div>
+              <div className="flex gap-4">
+                <img 
+                  src={workoutData[currentExerciseIndex + 1].image}
+                  alt={workoutData[currentExerciseIndex + 1].name}
+                  className="w-24 h-24 object-cover rounded-lg"
+                />
+                <div>
+                  <h4 className="text-lg mb-1" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                    {workoutData[currentExerciseIndex + 1].name}
+                  </h4>
+                  <p className="text-sm text-[#999999]">
+                    {workoutData[currentExerciseIndex + 1].sets} sets × {workoutData[currentExerciseIndex + 1].reps}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex-1 overflow-hidden">
+            <div className="text-sm text-[#999999] mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+              WORKOUT PROGRESS
+            </div>
+            <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100% - 30px)' }}>
+              {workoutData.map((exercise, index) => (
+                <div 
+                  key={exercise.id}
+                  className={`p-4 rounded-lg border transition-all ${
+                    index === currentExerciseIndex
+                      ? 'bg-[#FF3C00] bg-opacity-10 border-[#FF3C00]'
+                      : index < currentExerciseIndex
+                        ? 'bg-[#1a1a1a] border-[#5EE8C0] opacity-60'
+                        : 'bg-[#1a1a1a] border-[#2a2a2a]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm mb-1" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                        {exercise.name}
+                      </div>
+                      <div className="text-xs text-[#999999]">
+                        {exercise.sets} × {exercise.reps}
+                      </div>
+                    </div>
+                    {index < currentExerciseIndex && (
+                      <div className="w-6 h-6 rounded-full bg-[#5EE8C0] flex items-center justify-center">
+                        <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    {index === currentExerciseIndex && (
+                      <div className="text-sm" style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#FF3C00' }}>
+                        IN PROGRESS
+                      </div>
+                    )}
+                  </div>
+                  {index === currentExerciseIndex && (
+                    <div className="mt-3 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#FF3C00] rounded-full transition-all"
+                        style={{ width: `${(currentSet / exercise.sets) * 100}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Bottom Bar */}
+      <div className="h-24 flex-shrink-0 border-t border-[#2a2a2a] flex items-center justify-center gap-6 px-8">
+        <button
+          onClick={() => setIsPaused(!isPaused)}
+          className="w-16 h-16 rounded-full border-2 border-[#5EE8C0] flex items-center justify-center hover:bg-[#5EE8C0] hover:bg-opacity-10 transition-all"
+        >
+          {isPaused ? (
+            <Play className="w-7 h-7 text-[#5EE8C0]" />
+          ) : (
+            <Pause className="w-7 h-7 text-[#5EE8C0]" />
+          )}
+        </button>
+        
+        <button
+          onClick={() => {
+            if (currentSet < currentExercise.sets) {
+              setCurrentSet(prev => prev + 1);
+              setTimer(0);
+            }
+          }}
+          disabled={currentSet >= currentExercise.sets}
+          className="px-10 py-4 bg-[#5EE8C0] text-black rounded-full hover:bg-opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+        >
+          NEXT SET
+        </button>
+        
+        <button
+          onClick={handleNextExercise}
+          disabled={currentExerciseIndex >= workoutData.length - 1}
+          className="px-8 py-4 border-2 border-[#5EE8C0] text-[#5EE8C0] rounded-full hover:bg-[#5EE8C0] hover:text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+        >
+          NEXT EXERCISE
+        </button>
+        
+        <button
+          onClick={handleSkip}
+          disabled={currentExerciseIndex >= workoutData.length - 1}
+          className="w-16 h-16 rounded-full border-2 border-[#999999] flex items-center justify-center hover:border-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <SkipForward className="w-7 h-7 text-[#999999]" />
+        </button>
+      </div>
       </div>
     </div>
   );
 }
+
+export default App;
