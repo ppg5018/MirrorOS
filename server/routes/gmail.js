@@ -1,7 +1,11 @@
 const express = require('express')
 const router  = express.Router()
+const fs      = require('fs')
+const path    = require('path')
 const { google } = require('googleapis')
 const { getAuthClient } = require('../google-auth')
+
+const TOKEN_PATH = path.join(__dirname, '../../config/google-token.json')
 
 const MOCK = {
   unread: 2,
@@ -54,7 +58,12 @@ router.get('/', async (req, res) => {
       // Extract name from "Name <email@domain.com>"
       const sender = from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() || from
 
-      previews.push({ sender, subject })
+      // internalDate is Unix ms string from Gmail
+      const date = detail.data.internalDate
+        ? new Date(parseInt(detail.data.internalDate, 10)).toISOString()
+        : null
+
+      previews.push({ sender, subject, date, unread: true })
     }
 
     // Fetch user's real display name + email via OAuth2 userinfo
@@ -72,6 +81,12 @@ router.get('/', async (req, res) => {
 
   } catch (err) {
     console.error('[gmail] API error:', err.message)
+    // Expired/revoked token — delete it so the next request falls to MOCK cleanly
+    if (err.message?.includes('invalid_grant') || err.code === 400) {
+      try { fs.unlinkSync(TOKEN_PATH) } catch (_) {}
+      console.error('[gmail] Token invalid — deleted. Re-run: node server/google-auth.js')
+      cache = null; cacheAt = 0
+    }
     res.json({ ...MOCK, error: err.message })
   }
 })

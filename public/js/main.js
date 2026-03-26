@@ -469,8 +469,17 @@ async function fetchGmail() {
     if (!widget || !data.previews) return
 
     widget.querySelectorAll('.notif-item').forEach(el => el.remove())
+    widget.querySelectorAll('.notif-auth-warn').forEach(el => el.remove())
 
-    // Label stays as "Notifications" — no unread count in header (Figma spec)
+    // Show auth warning if Google token expired
+    if (data.mock && data.error) {
+      const warn = document.createElement('div')
+      warn.className = 'notif-auth-warn'
+      warn.style.cssText = 'font-size:10px;color:rgba(255,100,100,0.7);padding:4px 0 8px;font-family:var(--font-mono)'
+      warn.textContent = '⚠ Google auth expired — run: node server/google-auth.js'
+      widget.appendChild(warn)
+      return
+    }
 
     data.previews.forEach(p => {
       const timeLabel = _notifTimeLabel(p.date)
