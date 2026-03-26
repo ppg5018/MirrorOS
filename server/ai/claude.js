@@ -64,7 +64,14 @@ FITNESS RULES:
 - "workout status" / "how am I doing" / "how many calories"    → fitness_control action: status
 - "show me workouts" / "what workouts do you have"             → fitness_control action: list_workouts
 - Workout IDs: hiit-circuit, upper-body, lower-body, core-crusher, full-body-burn, morning-yoga, stretching, 5-minute-quickie
-- Default weight is 70kg. Only ask for weight if user mentions it.`
+- Default weight is 70kg. Only ask for weight if user mentions it.
+
+KARAOKE RULES:
+- "karaoke mode" / "show lyrics" / "sing along"          → karaoke_control action: open
+- "lyrics for this song" / "open karaoke"                → karaoke_control action: fetch_lyrics
+- "play [song] in karaoke" / "play [song] with lyrics"   → karaoke_control action: play, query=song name
+- "close karaoke" / "exit lyrics" / "go back"            → karaoke_control action: close
+- Never say you can't show lyrics — always try.`
 
 // ── Conversation memory ──────────────────────────────────────
 const MAX_EXCHANGES = 5
@@ -150,7 +157,8 @@ const TOOL_TO_WIDGET = {
   set_reminder:          'ai-bar',
   get_quote:             'quote',
   control_slideshow:     null,
-  fitness_control:       'fitness'
+  fitness_control:       'fitness',
+  karaoke_control:       null
 }
 
 const tools = [
@@ -340,6 +348,25 @@ const tools = [
         },
         workoutId: { type: 'string', description: 'Workout ID for start action (e.g. hiit-circuit, 5-minute-quickie)' },
         weightKg: { type: 'number', description: 'User weight in kg for calorie calculation' }
+      },
+      required: ['action']
+    }
+  },
+  {
+    name: 'karaoke_control',
+    description: 'Control karaoke mode — open, close, play a specific song in karaoke, or fetch lyrics for the current track',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['open', 'close', 'fetch_lyrics', 'play'],
+          description: 'open: go to karaoke screen | close: return to dashboard | fetch_lyrics: fetch lyrics for current song and open karaoke | play: search and play a song then open karaoke'
+        },
+        query: {
+          type: 'string',
+          description: 'Song name / artist for play action (e.g. "Tum Hi Ho" or "Coldplay Yellow")'
+        }
       },
       required: ['action']
     }

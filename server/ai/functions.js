@@ -292,6 +292,65 @@ const functions = {
     return post('/api/fitness/action', { action: input.action })
   },
 
+  karaoke_control: async (input, io) => {
+    if (input.action === 'open') {
+      if (io) io.emit('mode:karaoke', {})
+      return { success: true, message: 'Opening karaoke mode.' }
+    }
+    if (input.action === 'close') {
+      if (io) io.emit('mode:dashboard', {})
+      return { success: true, message: 'Closing karaoke.' }
+    }
+    if (input.action === 'play') {
+      if (!input.query) return { success: false, message: 'What song would you like to play?' }
+      const results = await get('/api/spotify/search?q=' + encodeURIComponent(input.query))
+      if (!results.length) return { success: false, message: `Could not find "${input.query}" on Spotify.` }
+      const top = results[0]
+      // Start playback via REST API (reliable — doesn't need SDK active device)
+      await post('/api/spotify/play', { uri: top.uri }).catch(() => {
+        // Fallback to Web Playback SDK if REST fails
+        if (io) io.emit('spotify-play', { uri: top.uri })
+      })
+      // Navigate to karaoke page after Spotify has a moment to start
+      const track = {
+        name:        top.title,
+        artist:      top.artist,
+        album:       top.album || '',
+        duration_ms: (top.duration || 0) * 1000
+      }
+      setTimeout(() => {
+        if (io) io.emit('mode:karaoke', { track })
+      }, 1500)
+      return { success: true, message: `Playing ${top.title} by ${top.artist} in karaoke mode.` }
+    }
+    if (input.action === 'fetch_lyrics') {
+      // Fetch currently playing track then return lyrics status
+      try {
+        const pos = await get('/api/spotify/position')
+        if (!pos.track) return { success: false, message: 'Nothing is playing on Spotify right now.' }
+        const params = new URLSearchParams({
+          artist: pos.track.artist,
+          track:  pos.track.name,
+          album:  pos.track.album || ''
+        })
+        const lyrics = await get('/api/karaoke/lyrics?' + params)
+        if (lyrics.error === 'not_found') {
+          return { success: false, message: `No lyrics found for ${pos.track.name}.` }
+        }
+        if (io) io.emit('mode:karaoke', {})
+        return {
+          success: true,
+          synced: lyrics.synced,
+          lineCount: lyrics.lines ? lyrics.lines.length : 0,
+          message: `Found ${lyrics.synced ? 'synced' : 'unsynced'} lyrics for ${pos.track.name} — opening karaoke mode.`
+        }
+      } catch (err) {
+        return { success: false, message: 'Could not fetch lyrics: ' + err.message }
+      }
+    }
+    return { error: 'Unknown karaoke action: ' + input.action }
+  },
+
   morning_briefing: async (_input, _io) => {
     const [weather, calendar, whatsapp, tasksRes] = await Promise.all([
       get('/api/weather'),

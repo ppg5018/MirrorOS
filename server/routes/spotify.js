@@ -167,6 +167,71 @@ router.get('/liked-songs', safe(async (req, res) => {
   res.json({ tracks })
 }))
 
+// ── GET /api/spotify/position ─────────────────────────────────
+// Near real-time position for karaoke sync — 500ms cache only
+let _positionCache = null
+let _positionCacheAt = 0
+const POSITION_TTL = 500
+
+router.get('/position', safe(async (req, res) => {
+  if (_positionCache && Date.now() - _positionCacheAt < POSITION_TTL) {
+    return res.json(_positionCache)
+  }
+
+  const token = await (require('../helpers/spotify-auth').getValidToken)()
+  if (!token) {
+    // Mock data for testing without Spotify
+    const mock = {
+      position_ms: Date.now() % 278000,   // cycles within song length
+      is_playing:  true,
+      track: { name: 'Tum Hi Ho', artist: 'Arijit Singh', album: 'Aashiqui 2', duration_ms: 278000 }
+    }
+    return res.json(mock)
+  }
+
+  const data = await spotify('GET', '/me/player/currently-playing')
+  if (!data || !data.item) {
+    return res.json({ position_ms: 0, is_playing: false, track: null })
+  }
+
+  const result = {
+    position_ms: data.progress_ms || 0,
+    is_playing:  data.is_playing,
+    track: {
+      id:          data.item.id,
+      name:        data.item.name,
+      artist:      data.item.artists.map(a => a.name).join(', '),
+      album:       data.item.album.name,
+      album_art:   data.item.album.images[0]?.url || null,
+      duration_ms: data.item.duration_ms
+    }
+  }
+
+  _positionCache   = result
+  _positionCacheAt = Date.now()
+  res.json(result)
+}))
+
+// ── GET /api/spotify/analysis?track_id= ───────────────────────
+// Returns beat timestamps for visualizer sync. Cached forever (analysis is immutable).
+const _analysisCache = {}
+router.get('/analysis', safe(async (req, res) => {
+  const { track_id } = req.query
+  if (!track_id) return res.status(400).json({ error: 'track_id required' })
+  if (_analysisCache[track_id]) return res.json(_analysisCache[track_id])
+
+  const data = await spotify('GET', '/audio-analysis/' + track_id)
+
+  const result = {
+    tempo:  data.track?.tempo || 120,
+    beats:  (data.beats  || []).map(b => ({ ms: Math.round(b.start * 1000), confidence: b.confidence })),
+    bars:   (data.bars   || []).map(b => ({ ms: Math.round(b.start * 1000) })),
+  }
+
+  _analysisCache[track_id] = result
+  res.json(result)
+}))
+
 // ── GET /api/spotify/playlists ────────────────────────────────
 router.get('/playlists', safe(async (req, res) => {
   const data = await spotify('GET', '/me/playlists?limit=20')

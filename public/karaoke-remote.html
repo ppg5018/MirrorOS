@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MirrorOS · Karaoke Remote</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/karaoke-remote.css" />
+</head>
+<body>
+  <div id="track-info">
+    <img id="album-art" src="" alt="" />
+    <div id="track-text">
+      <div id="track-name">—</div>
+      <div id="track-artist">Open Spotify and play a song</div>
+    </div>
+  </div>
+
+  <div id="lyric-display">
+    <div id="remote-lyric">Waiting for lyrics…</div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-offset-minus" title="Lyrics too early">
+      <span class="ctrl-icon">⏪</span>
+      <span class="ctrl-label">−0.5s</span>
+    </button>
+    <button class="ctrl-btn" id="btn-skip" title="Skip song">
+      <span class="ctrl-icon">⏭</span>
+      <span class="ctrl-label">Skip</span>
+    </button>
+    <button class="ctrl-btn" id="btn-offset-plus" title="Lyrics too late">
+      <span class="ctrl-icon">⏩</span>
+      <span class="ctrl-label">+0.5s</span>
+    </button>
+  </div>
+
+  <div id="offset-display">sync offset: <span id="offset-value">0.0s</span></div>
+
+  <button id="exit-remote" onclick="send('exit')">✕ Exit Karaoke</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/karaoke-remote.js"></script>
+</body>
+</html>

@@ -20,7 +20,7 @@ class MusicWidget {
     }
     window.musicWidgetInstance = this
     this._fetchAndUpdate()
-    setInterval(() => this._fetchAndUpdate(), 5000)
+    setInterval(() => this._fetchAndUpdate(), 10000) // Pi: 10s saves 12 Spotify calls/min
   }
 
   async _fetchAndUpdate() {

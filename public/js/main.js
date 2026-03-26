@@ -95,7 +95,7 @@ function updateClock() {
 }
 
 updateClock()
-setInterval(updateClock, 1000)
+setInterval(updateClock, 5000) // Pi: 5s is fine — we only display HH:MM
 
 // ── Weather ────────────────────────────────
 async function fetchWeather() {

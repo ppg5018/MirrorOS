@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirrorOS · Karaoke</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital@0;1&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/karaoke.css" />
+</head>
+<body>
+  <!-- Blurred album art ambient background -->
+  <div id="album-bg"></div>
+  <div id="album-overlay"></div>
+
+  <canvas id="visualizer"></canvas>
+  <div id="particles"></div>
+
+  <div id="song-info">
+    <div id="song-title"></div>
+    <div id="song-artist"></div>
+  </div>
+
+  <div id="lyrics-container">
+    <div id="lyric-past-2" class="lyric past-2"></div>
+    <div id="lyric-past-1" class="lyric past-1"></div>
+    <div id="lyric-current" class="lyric current">
+      <span class="quote-open">❝</span>
+      <span id="lyric-text"></span>
+      <span class="quote-close">❞</span>
+    </div>
+    <div id="lyric-next-1" class="lyric next-1"></div>
+    <div id="lyric-next-2" class="lyric next-2"></div>
+  </div>
+
+  <div id="progress-section">
+    <span id="time-current">0:00</span>
+    <div id="progress-track"><div id="progress-fill"></div></div>
+    <span id="time-total">0:00</span>
+  </div>
+
+  <button id="exit-btn">✕</button>
+
+  <!-- Remote companion hint — shown bottom-left -->
+  <div id="remote-hint">
+    <span>📱</span>
+    <span id="remote-url"></span>
+  </div>
+
+  <script>
+    // Populate remote URL hint dynamically
+    document.getElementById('remote-url').textContent =
+      window.location.origin + '/karaoke/remote'
+  </script>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/karaoke-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "id": "custom-1774025243880",
+  "name": "upper body  pg",
+  "category": "custom",
+  "difficulty": "custom",
+  "durationMinutes": 9,
+  "estimatedCalories": 50,
+  "description": "Custom workout",
+  "exercises": [
+    {
+      "exerciseId": "0047",
+      "name": "barbell incline bench press",
+      "target": "pectorals",
+      "sets": 3,
+      "reps": 10,
+      "restSeconds": 60,
+      "metValue": 5
+    },
+    {
+      "exerciseId": "0033",
+      "name": "barbell decline bench press",
+      "target": "pectorals",
+      "sets": 3,
+      "reps": 10,
+      "restSeconds": 60,
+      "metValue": 5
+    }
+  ]
+}

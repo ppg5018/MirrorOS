@@ -1,0 +1,169 @@
+/* ============================================
+   MirrorOS — Karaoke Remote (mobile)
+   ============================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 24px 32px;
+  gap: 0;
+}
+
+/* ── Track info ── */
+#track-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+#album-art {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: none;
+}
+
+#track-text {
+  overflow: hidden;
+}
+
+#track-name {
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#track-artist {
+  font-size: 12px;
+  color: #555;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Lyric display ── */
+#lyric-display {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 8px;
+}
+
+#remote-lyric {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(18px, 5vw, 26px);
+  color: #4af0c4;
+  text-align: center;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+  transition: opacity 150ms ease;
+}
+
+@keyframes lyric-flash {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+#remote-lyric.lyric-flash {
+  animation: lyric-flash 200ms ease forwards;
+}
+
+/* ── Controls ── */
+#controls {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  justify-content: center;
+}
+
+.ctrl-btn {
+  flex: 1;
+  max-width: 110px;
+  background: #0d0d0d;
+  border: 1px solid #222;
+  border-radius: 14px;
+  color: #fff;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ctrl-btn:active {
+  background: rgba(74, 240, 196, 0.08);
+  border-color: #4af0c4;
+  transform: scale(0.96);
+}
+
+.ctrl-icon {
+  font-size: 22px;
+}
+
+.ctrl-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.05em;
+}
+
+/* ── Offset display ── */
+#offset-display {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: #333;
+  letter-spacing: 0.08em;
+  margin-top: 12px;
+}
+
+#offset-value {
+  color: #4af0c4;
+}
+
+/* ── Exit button ── */
+#exit-remote {
+  margin-top: 20px;
+  background: none;
+  border: 1px solid #1a1a1a;
+  color: #2a2a2a;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 10px 24px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+  width: 100%;
+}
+
+#exit-remote:active {
+  border-color: #c44;
+  color: #c44;
+}

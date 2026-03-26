@@ -17,7 +17,7 @@ const MOCK = {
 }
 
 let cache = { data: null, ts: 0 }
-const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+const CACHE_TTL = 30 * 60 * 1000 // 30 minutes — Pi-friendly, weather barely changes
 
 const CONDITION_ICONS = {
   'clear sky': '☀️', 'few clouds': '🌤', 'scattered clouds': '⛅',

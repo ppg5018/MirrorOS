@@ -8,12 +8,15 @@ module.exports = {
       restart_delay: 3000,
       max_restarts: 10,
       min_uptime: '10s',
+      // Pi 3B has 1GB — cap Node at 512MB so Chromium + Python have room
+      node_args: '--max-old-space-size=512 --optimize-for-size',
       out_file: '/var/log/mirroros/backend-out.log',
       error_file: '/var/log/mirroros/backend-err.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3000,
+        UV_THREADPOOL_SIZE: '2'
       }
     },
     {

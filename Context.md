@@ -52,6 +52,7 @@ Frontend  →  Vanilla JS + HTML + CSS (NO React, NO Vue, NO build toolchain)
              Socket.io client (real-time updates)
              Alpine.js only if reactive state is needed (15KB, no npm)
 
+
 Backend   →  Node.js + Express (port 3000)
              Socket.io server (real-time push to UI)
              PM2 (process manager, auto-restart, auto-start on boot)
