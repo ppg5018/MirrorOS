@@ -11,6 +11,8 @@ const SPEAK_SCRIPT = path.join(__dirname, 'voice/speak.py')
 const BRIEFING_CRON = process.env.BRIEFING_CRON || '0 7 * * *'
 
 let scheduledJob = null
+let lastBriefingTime = null
+let briefingInProgress = false
 
 // ── Data aggregation ───────────────────────────────────────
 async function getData() {
@@ -96,11 +98,74 @@ async function triggerBriefing(io) {
 
     // Speak aloud via pyttsx3
     await speakText(text)
+    lastBriefingTime = Date.now()
 
     return { success: true, text }
   } catch (err) {
     logger.error(`[scheduler] Briefing failed: ${err.message}`)
     return { success: false, error: err.message }
+  }
+}
+
+// ── PIR auto-trigger logic ─────────────────────────────────
+function shouldAutoTrigger() {
+  if (process.env.BRIEFING_PIR_TRIGGER === 'false') return false
+  if (briefingInProgress) return false
+
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000))
+  const hour = ist.getUTCHours()
+  const min  = ist.getUTCMinutes()
+
+  const startHour = parseInt(process.env.BRIEFING_WINDOW_START   || '6')
+  const endHour   = parseInt(process.env.BRIEFING_WINDOW_END     || '9')
+  const endMin    = parseInt(process.env.BRIEFING_WINDOW_END_MIN || '30')
+
+  const afterStart = hour >= startHour
+  const beforeEnd  = hour < endHour || (hour === endHour && min <= endMin)
+  if (!afterStart || !beforeEnd) return false
+
+  const COOLDOWN_MS = parseInt(process.env.BRIEFING_COOLDOWN_HOURS || '2') * 60 * 60 * 1000
+  if (lastBriefingTime && (Date.now() - lastBriefingTime) < COOLDOWN_MS) return false
+
+  return true
+}
+
+async function triggerBriefingFromPIR(io) {
+  if (!shouldAutoTrigger()) {
+    logger.info('[scheduler] PIR motion — outside window or cooldown active, skipping briefing')
+    return { skipped: true }
+  }
+
+  logger.info('[scheduler] PIR motion — morning window detected, triggering auto briefing')
+  briefingInProgress = true
+
+  const delay = parseInt(process.env.BRIEFING_PIR_DELAY_MS || '3000')
+  await new Promise(r => setTimeout(r, delay))
+
+  if (io) io.emit('briefing:starting', { source: 'pir', timestamp: new Date().toISOString() })
+
+  try {
+    const result = await triggerBriefing(io)
+    if (io) io.emit('briefing:complete', { source: 'pir', text: result.text || '' })
+    logger.info('[scheduler] Auto briefing complete. Next available after cooldown.')
+    return result
+  } finally {
+    briefingInProgress = false
+  }
+}
+
+function getBriefingStatus() {
+  return {
+    lastBriefingTime,
+    briefingInProgress,
+    cooldownActive: lastBriefingTime
+      ? (Date.now() - lastBriefingTime) < (parseInt(process.env.BRIEFING_COOLDOWN_HOURS || '2') * 60 * 60 * 1000)
+      : false,
+    pirTriggerEnabled: process.env.BRIEFING_PIR_TRIGGER !== 'false',
+    windowStart:   parseInt(process.env.BRIEFING_WINDOW_START   || '6'),
+    windowEnd:     parseInt(process.env.BRIEFING_WINDOW_END     || '9'),
+    windowEndMin:  parseInt(process.env.BRIEFING_WINDOW_END_MIN || '30')
   }
 }
 
@@ -138,4 +203,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, triggerBriefing, getNextBriefingTime }
+module.exports = { start, stop, triggerBriefing, triggerBriefingFromPIR, getBriefingStatus, getNextBriefingTime }

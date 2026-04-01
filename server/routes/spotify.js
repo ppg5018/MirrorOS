@@ -38,6 +38,98 @@ function safe(fn) {
   }
 }
 
+// ── GET /api/spotify/auth — start OAuth web flow ─────────────
+router.get('/auth', (req, res) => {
+  const { getMirrorBaseURL } = require('../utils/network')
+
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    return res.status(400).send('SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not set in .env')
+  }
+
+  const redirectURI = `${getMirrorBaseURL()}/api/spotify/callback`
+  const scopes = [
+    'streaming', 'user-read-email', 'user-read-private',
+    'user-read-playback-state', 'user-modify-playback-state',
+    'user-read-currently-playing', 'playlist-read-private',
+    'playlist-read-collaborative', 'user-library-read',
+    'user-top-read', 'user-read-recently-played'
+  ].join(' ')
+
+  const state = require('crypto').randomBytes(16).toString('hex')
+  // Store state in app locals for verification
+  req.app.set('spotify_oauth_state', state)
+
+  const url = 'https://accounts.spotify.com/authorize' +
+    '?response_type=code' +
+    '&client_id=' + encodeURIComponent(process.env.SPOTIFY_CLIENT_ID) +
+    '&scope=' + encodeURIComponent(scopes) +
+    '&redirect_uri=' + encodeURIComponent(redirectURI) +
+    '&state=' + state
+
+  res.redirect(url)
+})
+
+// ── GET /api/spotify/callback — handle OAuth response ─────────
+router.get('/callback', async (req, res) => {
+  const { getMirrorBaseURL } = require('../utils/network')
+  const fs   = require('fs')
+  const path = require('path')
+  const base = getMirrorBaseURL()
+
+  const { code, state, error } = req.query
+
+  if (error) return res.redirect(`${base}/setup?step=spotify&status=error&msg=${encodeURIComponent(error)}`)
+
+  const savedState = req.app.get('spotify_oauth_state')
+  if (state !== savedState) return res.redirect(`${base}/setup?step=spotify&status=error&msg=state_mismatch`)
+
+  const redirectURI = `${base}/api/spotify/callback`
+  const creds = Buffer.from(process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET).toString('base64')
+
+  try {
+    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + creds, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectURI }).toString()
+    })
+    const tokenData = await tokenRes.json()
+    if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error)
+
+    const profileRes = await fetch('https://api.spotify.com/v1/me', {
+      headers: { 'Authorization': 'Bearer ' + tokenData.access_token }
+    })
+    const profile = await profileRes.json()
+
+    const token = {
+      accessToken:  tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresAt:    Date.now() + (tokenData.expires_in * 1000),
+      scope:        tokenData.scope,
+      displayName:  profile.display_name,
+      email:        profile.email,
+      country:      profile.country,
+      savedAt:      new Date().toISOString()
+    }
+
+    const tokenPath = path.join(__dirname, '../../config/spotify-token.json')
+    fs.mkdirSync(path.dirname(tokenPath), { recursive: true })
+    fs.writeFileSync(tokenPath, JSON.stringify(token, null, 2))
+
+    const io = req.app.get('io')
+    if (io) io.emit('setup:step-complete', { step: 'spotify', success: true })
+
+    res.redirect(`${base}/setup?step=spotify&status=success`)
+  } catch (err) {
+    res.redirect(`${base}/setup?step=spotify&status=error&msg=${encodeURIComponent(err.message)}`)
+  }
+})
+
+// ── GET /api/spotify/auth/redirect-uri — show URI for Spotify dashboard ──
+router.get('/auth/redirect-uri', (req, res) => {
+  const { getMirrorBaseURL } = require('../utils/network')
+  res.json({ redirectURI: `${getMirrorBaseURL()}/api/spotify/callback` })
+})
+
 // ── GET /api/spotify/status ───────────────────────────────────
 router.get('/status', (req, res) => {
   res.json({ connected: isConnected(), user: getUserInfo(), source: 'oauth_token_file' })

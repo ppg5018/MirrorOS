@@ -94,3 +94,14 @@ socket.on('motion', ({ screenOn }) => {
 socket.on('notification', (data) => {
   console.log('[socket] notification:', data)
 })
+
+// ── Morning briefing lifecycle ─────────────
+socket.on('briefing:starting', (data) => {
+  console.log('[socket] briefing starting:', data.source)
+  document.dispatchEvent(new CustomEvent('briefing:starting', { detail: data }))
+})
+
+socket.on('briefing:complete', (data) => {
+  console.log('[socket] briefing complete')
+  document.dispatchEvent(new CustomEvent('briefing:complete', { detail: data }))
+})

@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mira Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000;
+      --surface: #0f0f0f;
+      --surface2: #161616;
+      --accent: #4ecdc4;
+      --accent-dim: rgba(78,205,196,0.15);
+      --accent-border: rgba(78,205,196,0.25);
+      --white: #fff;
+      --dim: rgba(255,255,255,0.45);
+      --dimmer: rgba(255,255,255,0.25);
+      --danger: rgba(255,90,90,0.85);
+      --warn-bg: rgba(255,200,0,0.06);
+      --warn-border: rgba(255,200,0,0.2);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Progress bar ── */
+    #progress-bar-wrap {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: var(--surface);
+      padding-bottom: 14px;
+    }
+    #progress-track {
+      height: 3px;
+      background: #1a1a1a;
+    }
+    #progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.4s ease;
+      width: 12.5%;
+    }
+    #step-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding-top: 10px;
+    }
+    .step-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #2a2a2a;
+      transition: all 0.3s;
+    }
+    .step-dot.done   { background: rgba(78,205,196,0.5); }
+    .step-dot.active { background: var(--accent); width: 18px; border-radius: 3px; }
+
+    /* ── Content area ── */
+    #content {
+      min-height: 100vh;
+      padding: 80px 24px 120px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .step-num {
+      text-align: center;
+      font-size: 11px;
+      color: var(--dimmer);
+      margin-bottom: 18px;
+    }
+    .step-title {
+      font-size: 28px;
+      font-weight: 300;
+      color: var(--white);
+      text-align: center;
+      margin-bottom: 10px;
+      line-height: 1.2;
+    }
+    .step-desc {
+      font-size: 14px;
+      color: var(--dim);
+      text-align: center;
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    /* ── Bottom nav ── */
+    #bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid #1a1a1a;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+    }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 13px 22px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      font-family: inherit;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-back {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: var(--dim);
+      min-width: 90px;
+    }
+    .btn-continue {
+      background: var(--accent);
+      color: #000;
+      flex: 1;
+      max-width: 240px;
+      margin-left: auto;
+    }
+    .btn-continue:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-skip {
+      background: transparent;
+      color: var(--dimmer);
+      font-size: 13px;
+      padding: 10px 16px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .btn-skip:hover { color: var(--dim); }
+
+    /* ── Mirror illustration ── */
+    .mirror-illustration {
+      width: 120px;
+      height: 160px;
+      margin: 0 auto 28px;
+      position: relative;
+    }
+    .mirror-frame {
+      width: 100%; height: 100%;
+      border: 2px solid rgba(78,205,196,0.4);
+      border-radius: 60px 60px 12px 12px;
+      background: var(--surface);
+      box-shadow: 0 0 40px rgba(78,205,196,0.08), inset 0 0 30px rgba(78,205,196,0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mirror-line {
+      width: 50%;
+      height: 1px;
+      background: rgba(78,205,196,0.25);
+      border-radius: 1px;
+    }
+    .mirror-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(78,205,196,0.5);
+    }
+
+    /* ── Checklist ── */
+    .checklist {
+      list-style: none;
+      margin: 0 auto;
+      max-width: 280px;
+    }
+    .checklist li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 14px;
+      color: var(--dim);
+      border-bottom: 1px solid #111;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before {
+      content: '✓';
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── Form fields ── */
+    .field-group { margin-bottom: 18px; }
+    .field-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--dimmer);
+      margin-bottom: 7px;
+    }
+    .field-row {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid #222;
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .field-row:focus-within { border-color: var(--accent); }
+    .field-input, .field-select {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-size: 15px;
+      font-family: inherit;
+      padding: 13px 16px;
+      -webkit-appearance: none;
+    }
+    .field-select { cursor: pointer; }
+    .field-suffix {
+      padding-right: 14px;
+      color: var(--dimmer);
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    select option { background: #111; }
+
+    /* ── Cards ── */
+    .info-card {
+      background: var(--surface);
+      border: 1px solid #1e1e1e;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .warn-card {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      font-size: 13px;
+    }
+    .warn-card-title {
+      color: rgba(255,200,0,0.9);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .warn-card p { color: var(--dim); line-height: 1.6; }
+
+    /* ── Status states ── */
+    .success-state {
+      text-align: center;
+      padding: 24px 0;
+    }
+    .check-circle {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 28px;
+      color: var(--accent);
+    }
+    .success-title {
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: 6px;
+    }
+    .success-sub { font-size: 13px; color: var(--dim); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 2px solid #1a1a1a;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Google sign-in button ── */
+    .btn-google {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      color: #333;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 20px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+      transition: opacity 0.2s;
+      margin-bottom: 12px;
+    }
+    .btn-google:hover { opacity: 0.92; }
+    .btn-google svg { flex-shrink: 0; }
+
+    /* ── Spotify button ── */
+    .btn-spotify {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1DB954;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+      transition: opacity 0.2s;
+      margin-bottom: 12px;
+    }
+    .btn-spotify:hover { opacity: 0.9; }
+
+    /* ── QR canvas ── */
+    #whatsapp-qr-canvas {
+      display: block;
+      margin: 0 auto 20px;
+      border-radius: 12px;
+    }
+    .qr-instructions { list-style: none; }
+    .qr-instructions li {
+      padding: 9px 0;
+      font-size: 14px;
+      color: var(--dim);
+      border-bottom: 1px solid #111;
+      display: flex;
+      gap: 10px;
+    }
+    .qr-instructions li:last-child { border-bottom: none; }
+    .qr-step-num {
+      font-size: 11px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 50%;
+      width: 20px; height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 700;
+    }
+
+    /* ── Test buttons ── */
+    .test-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--white);
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      margin-bottom: 10px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .test-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+    .test-btn .test-icon { font-size: 18px; flex-shrink: 0; }
+    .test-btn .test-label { flex: 1; }
+    .test-btn .test-result { font-size: 12px; color: var(--dim); }
+    .test-btn.done .test-result { color: var(--accent); }
+
+    /* ── Status grid ── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .status-item {
+      background: var(--surface);
+      border: 1px solid #1a1a1a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--dim);
+    }
+    .status-item .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #2a2a2a;
+      flex-shrink: 0;
+    }
+    .status-item.ok .status-dot { background: var(--accent); }
+
+    /* ── Complete page ── */
+    .complete-check {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      color: var(--accent);
+      font-size: 36px;
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .complete-name {
+      font-size: 30px;
+      font-weight: 200;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .commands-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 18px 0;
+    }
+    .command-pill {
+      background: var(--surface2);
+      border: 1px solid #222;
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: var(--dim);
+    }
+    .btn-view-mirror {
+      display: block;
+      background: var(--accent);
+      color: #000;
+      text-align: center;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      margin-top: 24px;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    /* ── Accordion ── */
+    .accordion { border: 1px solid #1e1e1e; border-radius: 10px; overflow: hidden; margin-top: 12px; }
+    .accordion-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      cursor: pointer;
+      background: var(--surface);
+      font-size: 14px;
+      color: var(--dim);
+    }
+    .accordion-header:hover { background: var(--surface2); }
+    .accordion-arrow { transition: transform 0.3s; font-size: 12px; }
+    .accordion-header.open .accordion-arrow { transform: rotate(180deg); }
+    .accordion-body {
+      display: none;
+      padding: 0 16px 16px;
+      background: var(--surface);
+    }
+    .accordion-body.open { display: block; }
+    .accordion-step {
+      display: flex;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid #111;
+      font-size: 13px;
+      color: var(--dim);
+    }
+    .accordion-step:last-child { border-bottom: none; }
+    .accordion-step-num {
+      font-size: 10px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 50%;
+      width: 18px; height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .uri-display {
+      background: #0a0a0a;
+      border: 1px solid var(--accent-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--accent);
+      word-break: break-all;
+      font-family: monospace;
+      margin: 10px 0;
+    }
+
+    /* ── Error / notification ── */
+    .error-msg {
+      color: var(--danger);
+      font-size: 12px;
+      margin-top: 8px;
+      text-align: center;
+    }
+    .btn-loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .btn-loading::after {
+      content: ' ···';
+    }
+  </style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress-bar-wrap">
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <div id="step-dots"></div>
+</div>
+
+<!-- Content -->
+<div id="content">
+  <div class="logo">Mira</div>
+  <div class="step-num" id="step-num">Step 1 of 8</div>
+  <div id="step-content"></div>
+</div>
+
+<!-- Bottom nav -->
+<div id="bottom-nav">
+  <button class="btn btn-back" id="btn-back" onclick="goBack()">Back</button>
+  <button class="btn btn-continue" id="btn-continue" onclick="goContinue()">Continue →</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────
+let currentStep = 1
+const TOTAL_STEPS = 8
+let stepData = {}
+let redirectURI = ''
+let mirrorURL = window.location.origin
+
+// ── URL param handling ─────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search)
+const urlStep   = urlParams.get('step')
+const urlStatus = urlParams.get('status')
+
+// ── Boot ──────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // Google OAuth redirected back
+  if (urlStep === 'google' && urlStatus === 'success') {
+    stepData.google = 'done'
+    goToStep(4)
+    return
+  }
+  if (urlStep === 'google' && urlStatus === 'error') {
+    stepData.googleError = urlParams.get('msg') || 'OAuth error'
+    goToStep(4)
+    return
+  }
+
+  // Spotify redirected back
+  if (urlStep === 'spotify' && urlStatus === 'success') {
+    stepData.spotify = 'done'
+    goToStep(6)
+    return
+  }
+  if (urlStep === 'spotify' && urlStatus === 'error') {
+    stepData.spotifyError = urlParams.get('msg') || 'OAuth error'
+    goToStep(6)
+    return
+  }
+
+  // Load instructions URI
+  fetch('/api/setup/google-auth-url/instructions')
+    .then(r => r.json())
+    .then(d => { redirectURI = d.redirectURI })
+    .catch(() => {})
+
+  goToStep(1)
+})
+
+// ── Navigation ──────────────────────────────────────────────
+function goToStep(n) {
+  currentStep = n
+  renderProgress()
+  renderStep()
+  window.scrollTo(0, 0)
+}
+
+function goBack() {
+  if (currentStep > 1) goToStep(currentStep - 1)
+}
+
+function goContinue() {
+  if (currentStep < TOTAL_STEPS) goToStep(currentStep + 1)
+}
+
+function renderProgress() {
+  const fill = document.getElementById('progress-fill')
+  fill.style.width = ((currentStep / TOTAL_STEPS) * 100) + '%'
+
+  const dotsEl = document.getElementById('step-dots')
+  dotsEl.innerHTML = ''
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const d = document.createElement('div')
+    d.className = 'step-dot' + (i < currentStep ? ' done' : i === currentStep ? ' active' : '')
+    dotsEl.appendChild(d)
+  }
+
+  document.getElementById('step-num').textContent = `Step ${currentStep} of ${TOTAL_STEPS}`
+
+  const backBtn     = document.getElementById('btn-back')
+  const continueBtn = document.getElementById('btn-continue')
+
+  backBtn.style.display    = currentStep === 1 ? 'none' : ''
+  continueBtn.style.display = currentStep === TOTAL_STEPS ? 'none' : ''
+}
+
+function setContinueEnabled(enabled) {
+  document.getElementById('btn-continue').disabled = !enabled
+}
+
+// ── Step renderers ──────────────────────────────────────────
+function renderStep() {
+  const el = document.getElementById('step-content')
+  switch (currentStep) {
+    case 1: renderStep1(el); break
+    case 2: renderStep2(el); break
+    case 3: renderStep3(el); break
+    case 4: renderStep4(el); break
+    case 5: renderStep5(el); break
+    case 6: renderStep6(el); break
+    case 7: renderStep7(el); break
+    case 8: renderStep8(el); break
+  }
+}
+
+// ── STEP 1 — Welcome ────────────────────────────────────────
+function renderStep1(el) {
+  el.innerHTML = `
+    <h1 class="step-title">Welcome to Mira</h1>
+    <p class="step-desc">Let's get your mirror set up.<br>This takes about 3 minutes.<br>Keep your phone close — we'll guide you through everything.</p>
+
+    <div class="mirror-illustration">
+      <div class="mirror-frame">
+        <div class="mirror-dot"></div>
+        <div class="mirror-line"></div>
+        <div class="mirror-line" style="width:35%"></div>
+        <div class="mirror-line"></div>
+      </div>
+    </div>
+
+    <ul class="checklist">
+      <li>Your personal profile</li>
+      <li>Google account (Calendar, Gmail)</li>
+      <li>WhatsApp notifications</li>
+      <li>Wake word preference</li>
+      <li>Morning briefing time</li>
+    </ul>
+  `
+  document.getElementById('btn-continue').textContent = "Let's Begin →"
+  setContinueEnabled(true)
+}
+
+// ── STEP 2 — Profile ────────────────────────────────────────
+function renderStep2(el) {
+  const saved = stepData.profile || {}
+  el.innerHTML = `
+    <h1 class="step-title">Tell Mira about you</h1>
+    <p class="step-desc">This is how Mira will greet you every morning.</p>
+
+    <div class="field-group">
+      <label class="field-label">Your first name</label>
+      <div class="field-row">
+        <input class="field-input" id="f-name" type="text" placeholder="e.g. Arjun" maxlength="30" value="${saved.name || ''}">
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Your city</label>
+      <div class="field-row">
+        <input class="field-input" id="f-city" type="text" placeholder="e.g. Pune" maxlength="50" value="${saved.city || ''}">
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Wake word</label>
+      <div class="field-row">
+        <select class="field-select" id="f-wake">
+          <option value="hey mirror" ${(saved.wakeWord||'hey mirror')==='hey mirror'?'selected':''}>Hey Mirror</option>
+          <option value="hey mira"   ${saved.wakeWord==='hey mira'?'selected':''}>Hey Mira</option>
+          <option value="hey jarvis" ${saved.wakeWord==='hey jarvis'?'selected':''}>Hey Jarvis</option>
+          <option value="hey nova"   ${saved.wakeWord==='hey nova'?'selected':''}>Hey Nova</option>
+          <option value="hey atlas"  ${saved.wakeWord==='hey atlas'?'selected':''}>Hey Atlas</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Morning briefing time</label>
+      <div class="field-row">
+        <select class="field-select" id="f-briefing">
+          ${generateBriefingOptions(saved.briefingTime)}
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Your weight — optional, for calorie tracking</label>
+      <div class="field-row">
+        <input class="field-input" id="f-weight" type="number" placeholder="e.g. 70" min="30" max="250" value="${saved.weightKg || ''}">
+        <span class="field-suffix">kg</span>
+      </div>
+    </div>
+    <div id="profile-error" class="error-msg" style="display:none"></div>
+  `
+
+  const checkValid = () => {
+    const name = document.getElementById('f-name').value.trim()
+    const city = document.getElementById('f-city').value.trim()
+    setContinueEnabled(!!(name && city))
+  }
+  document.getElementById('f-name').addEventListener('input', checkValid)
+  document.getElementById('f-city').addEventListener('input', checkValid)
+  checkValid()
+
+  document.getElementById('btn-continue').textContent = 'Continue →'
+
+  // Override continue to POST first
+  document.getElementById('btn-continue').onclick = saveProfile
+}
+
+function generateBriefingOptions(selected) {
+  let opts = ''
+  const times = []
+  for (let h = 5; h <= 10; h++) {
+    times.push(`${String(h).padStart(2,'0')}:00`)
+    if (h < 10) times.push(`${String(h).padStart(2,'0')}:30`)
+  }
+  const labels = {
+    '05:00':'5:00 AM','05:30':'5:30 AM','06:00':'6:00 AM','06:30':'6:30 AM',
+    '07:00':'7:00 AM','07:30':'7:30 AM','08:00':'8:00 AM','08:30':'8:30 AM',
+    '09:00':'9:00 AM','09:30':'9:30 AM','10:00':'10:00 AM'
+  }
+  times.forEach(t => {
+    const sel = (selected || '07:00') === t ? 'selected' : ''
+    opts += `<option value="${t}" ${sel}>${labels[t] || t}</option>`
+  })
+  return opts
+}
+
+async function saveProfile() {
+  const btn  = document.getElementById('btn-continue')
+  const errEl = document.getElementById('profile-error')
+  const name  = document.getElementById('f-name').value.trim()
+  const city  = document.getElementById('f-city').value.trim()
+  const wakeWord    = document.getElementById('f-wake').value
+  const briefingTime = document.getElementById('f-briefing').value
+  const weightKg    = parseInt(document.getElementById('f-weight').value) || 70
+
+  if (!name || !city) return
+
+  btn.classList.add('btn-loading')
+  errEl.style.display = 'none'
+
+  try {
+    const res = await fetch('/api/setup/user-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, city, wakeWord, briefingTime, weightKg })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Save failed')
+    stepData.profile = { name, city, wakeWord, briefingTime, weightKg }
+    goToStep(3)
+  } catch (err) {
+    errEl.textContent = err.message
+    errEl.style.display = 'block'
+  } finally {
+    btn.classList.remove('btn-loading')
+  }
+}
+
+// ── STEP 3 — WiFi Check ─────────────────────────────────────
+function renderStep3(el) {
+  el.innerHTML = `
+    <h1 class="step-title">Connected to WiFi</h1>
+    <p class="step-desc">Your mirror and phone must be on the same WiFi network for setup to work.</p>
+
+    <div class="success-state">
+      <div class="check-circle">✓</div>
+      <div class="success-title">Mirror detected on your network</div>
+      <div class="success-sub" id="wifi-ip">Checking...</div>
+    </div>
+
+    <div class="info-card">
+      <p style="font-size:13px;color:var(--dim);line-height:1.7">
+        If you can see this page, your mirror is reachable. ✓<br><br>
+        Make sure both your <strong style="color:var(--white)">phone and mirror</strong> are on the same WiFi network.<br><br>
+        <strong style="color:rgba(255,200,0,0.8)">Tip:</strong> Set a DHCP reservation for your mirror's MAC address in your router settings so the IP never changes.
+      </p>
+    </div>
+  `
+  setContinueEnabled(true)
+  document.getElementById('btn-continue').textContent = 'Continue →'
+  document.getElementById('btn-continue').onclick = goContinue
+
+  fetch('/api/setup/status')
+    .then(r => r.json())
+    .then(d => {
+      const ipEl = document.getElementById('wifi-ip')
+      if (ipEl) ipEl.textContent = `IP Address: ${d.mirrorIP} · Signal: Ready`
+    })
+    .catch(() => {})
+}
+
+// ── STEP 4 — Google (Web OAuth — paste redirect URL) ─────────
+async function renderStep4(el) {
+  const isConnected = stepData.google === 'done'
+
+  el.innerHTML = `
+    <h1 class="step-title">Connect Google</h1>
+    <p class="step-desc">Link your Google account to see Calendar events, Gmail, and YouTube on your mirror.</p>
+
+    ${isConnected ? `
+    <div class="success-state">
+      <div class="check-circle">✓</div>
+      <div class="success-title">Google account connected</div>
+      <div class="success-sub">Calendar, Gmail, YouTube ready</div>
+    </div>
+    ` : `<div id="google-auth-ui"><div class="spinner"></div><p style="text-align:center;font-size:13px;color:var(--dim)">Loading...</p></div>`}
+  `
+
+  setContinueEnabled(isConnected)
+  document.getElementById('btn-continue').textContent = 'Continue →'
+  document.getElementById('btn-continue').onclick = () => goContinue()
+
+  const nav = document.getElementById('bottom-nav')
+  if (!document.getElementById('btn-skip-google')) {
+    const skipBtn = document.createElement('button')
+    skipBtn.id = 'btn-skip-google'
+    skipBtn.className = 'btn btn-skip'
+    skipBtn.textContent = 'Skip for now'
+    skipBtn.onclick = () => goToStep(5)
+    nav.insertBefore(skipBtn, nav.firstChild)
+  }
+
+  if (!isConnected) {
+    const status = await fetch('/api/setup/status').then(r => r.json()).catch(() => ({}))
+    if (status.steps && status.steps.google) {
+      stepData.google = 'done'
+      renderStep4(document.getElementById('step-content'))
+    } else {
+      showGoogleAuthUI()
+    }
+  }
+}
+
+async function showGoogleAuthUI() {
+  const ui = document.getElementById('google-auth-ui')
+  if (!ui) return
+
+  let authUrl
+  try {
+    const d = await fetch('/api/setup/google-auth-url-for-phone').then(r => r.json())
+    if (d.error) throw new Error(d.error)
+    authUrl = d.url
+  } catch (e) {
+    ui.innerHTML = `<p style="color:#ff4444;text-align:center">Failed to load: ${e.message}</p>`
+    return
+  }
+
+  ui.innerHTML = `
+    <div>
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="background:#4285F4;color:#fff;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">1</div>
+          <span style="font-size:14px;color:var(--white)">Tap to open Google sign-in on this phone</span>
+        </div>
+        <a href="${authUrl}" target="_blank"
+          style="display:block;background:#4285F4;color:#fff;border:none;border-radius:10px;
+            padding:13px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none">
+          Open Google Login
+        </a>
+      </div>
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="background:#333;color:#fff;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">2</div>
+          <span style="font-size:14px;color:var(--white)">Sign in with your Google account</span>
+        </div>
+        <p style="font-size:12px;color:var(--dim);margin:0;line-height:1.5">
+          After signing in, your browser will show a page that <strong style="color:var(--white)">"can't be reached"</strong>. That's expected.
+        </p>
+      </div>
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="background:#333;color:#fff;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">3</div>
+          <span style="font-size:14px;color:var(--white)">Copy the URL from the address bar and paste below</span>
+        </div>
+        <p style="font-size:11px;color:var(--dim);margin:0 0 10px;line-height:1.5">
+          Looks like: <span style="color:var(--accent);font-family:monospace;font-size:11px">http://127.0.0.1:3000/auth/google/callback?code=...</span>
+        </p>
+        <textarea id="google-url-input" placeholder="Paste the URL here..."
+          style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;border-radius:8px;
+            color:#fff;font-size:13px;padding:10px;resize:none;height:70px;font-family:monospace;
+            outline:none;line-height:1.4"
+          oninput="googleUrlChanged(this)"></textarea>
+        <div id="google-paste-error" style="color:#ff4444;font-size:12px;margin-top:6px;display:none"></div>
+      </div>
+
+      <button id="btn-google-submit" onclick="submitGoogleUrl()"
+        style="width:100%;padding:14px;background:var(--accent);color:#000;border:none;border-radius:10px;
+          font-size:15px;font-weight:700;cursor:pointer;opacity:0.4;pointer-events:none">
+        Connect Google
+      </button>
+    </div>
+  `
+}
+
+function googleUrlChanged(el) {
+  const btn = document.getElementById('btn-google-submit')
+  const has = el.value.trim().length > 10
+  btn.style.opacity = has ? '1' : '0.4'
+  btn.style.pointerEvents = has ? 'auto' : 'none'
+  document.getElementById('google-paste-error').style.display = 'none'
+}
+
+async function submitGoogleUrl() {
+  const input = document.getElementById('google-url-input')
+  const btn   = document.getElementById('btn-google-submit')
+  const errEl = document.getElementById('google-paste-error')
+  const url   = input.value.trim()
+  if (!url) return
+  btn.disabled = true; btn.textContent = 'Connecting...'
+
+  try {
+    const res  = await fetch('/api/setup/google-paste-url', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) {
+      errEl.textContent = data.error || 'Something went wrong'
+      errEl.style.display = 'block'
+      btn.disabled = false; btn.textContent = 'Connect Google'
+      return
+    }
+    stepData.google = 'done'
+    renderStep4(document.getElementById('step-content'))
+  } catch (e) {
+    errEl.textContent = 'Network error'
+    errEl.style.display = 'block'
+    btn.disabled = false; btn.textContent = 'Connect Google'
+  }
+}
+
+// ── STEP 5 — WhatsApp ───────────────────────────────────────
+let whatsappPollTimer = null
+
+function renderStep5(el) {
+  if (whatsappPollTimer) { clearInterval(whatsappPollTimer); whatsappPollTimer = null }
+
+  el.innerHTML = `
+    <h1 class="step-title">Connect WhatsApp</h1>
+    <p class="step-desc">Mira will show your WhatsApp messages on the mirror. No messages are stored — everything stays on your device.</p>
+    <div id="wa-content">
+      <div class="spinner"></div>
+      <p style="text-align:center;font-size:13px;color:var(--dim)">Connecting to WhatsApp...</p>
+    </div>
+  `
+
+  setContinueEnabled(false)
+  document.getElementById('btn-continue').textContent = 'Continue →'
+  document.getElementById('btn-continue').onclick = () => { if (whatsappPollTimer) clearInterval(whatsappPollTimer); goToStep(6) }
+
+  // Add skip button
+  const nav = document.getElementById('bottom-nav')
+  if (!document.getElementById('btn-skip-wa')) {
+    const skipBtn = document.createElement('button')
+    skipBtn.id = 'btn-skip-wa'
+    skipBtn.className = 'btn btn-skip'
+    skipBtn.textContent = 'Skip for now'
+    skipBtn.onclick = () => { if (whatsappPollTimer) clearInterval(whatsappPollTimer); goToStep(6) }
+    nav.insertBefore(skipBtn, nav.firstChild)
+  }
+
+  checkWhatsApp()
+  whatsappPollTimer = setInterval(checkWhatsApp, 3000)
+}
+
+let _waQrRendered = false
+async function checkWhatsApp() {
+  try {
+    const res = await fetch('/api/setup/whatsapp-qr')
+    const d   = await res.json()
+    const el  = document.getElementById('wa-content')
+    if (!el) { clearInterval(whatsappPollTimer); return }
+
+    if (d.connected) {
+      clearInterval(whatsappPollTimer)
+      _waQrRendered = false
+      el.innerHTML = `
+        <div class="success-state">
+          <div class="check-circle">✓</div>
+          <div class="success-title">WhatsApp connected</div>
+          <div class="success-sub">Messages will appear on your mirror</div>
+        </div>
+      `
+      setContinueEnabled(true)
+      return
+    }
+
+    if (d.qr && !_waQrRendered) {
+      _waQrRendered = true
+      el.innerHTML = `
+        <canvas id="whatsapp-qr-canvas"></canvas>
+        <ul class="qr-instructions">
+          <li><span class="qr-step-num">1</span>Open WhatsApp on your phone</li>
+          <li><span class="qr-step-num">2</span>Settings → Linked Devices</li>
+          <li><span class="qr-step-num">3</span>Tap "Link a Device" and scan the QR above</li>
+        </ul>
+      `
+      try {
+        QRCode.toCanvas(
+          document.getElementById('whatsapp-qr-canvas'),
+          d.qr,
+          { width: 200, margin: 2, color: { dark: '#ffffff', light: '#000000' } }
+        )
+      } catch (e) {}
+    } else if (!d.qr && d.error) {
+      el.innerHTML = `
+        <div class="info-card">
+          <p style="font-size:13px;color:var(--dim);text-align:center">
+            WhatsApp integration will be configured separately.<br>You can skip this step.
+          </p>
+        </div>
+      `
+      clearInterval(whatsappPollTimer)
+      setContinueEnabled(true)
+    }
+  } catch (e) {
+    clearInterval(whatsappPollTimer)
+    const el = document.getElementById('wa-content')
+    if (el) el.innerHTML = `
+      <div class="info-card">
+        <p style="font-size:13px;color:var(--dim);text-align:center">
+          WhatsApp is not available right now.<br>You can skip this step and connect later.
+        </p>
+      </div>
+    `
+    setContinueEnabled(true)
+  }
+}
+
+// ── STEP 6 — Spotify ────────────────────────────────────────
+let spotifyPollTimer = null
+
+function renderStep6(el) {
+  if (spotifyPollTimer) { clearInterval(spotifyPollTimer); spotifyPollTimer = null }
+  const isConnected = stepData.spotify === 'done'
+
+  el.innerHTML = `
+    <h1 class="step-title">Connect Spotify</h1>
+    <p class="step-desc">Say "Hey Mira, play lo-fi" and your music starts instantly.<br>Requires Spotify Premium.</p>
+
+    ${isConnected ? `
+    <div class="success-state">
+      <div class="check-circle">✓</div>
+      <div class="success-title">Spotify connected</div>
+      <div class="success-sub">Music ready to play</div>
+    </div>
+    ` : `
+    <div id="spotify-content">
+      <div class="spinner"></div>
+      <p style="text-align:center;font-size:13px;color:var(--dim)">Checking Spotify...</p>
+    </div>
+    `}
+  `
+
+  setContinueEnabled(isConnected)
+  document.getElementById('btn-continue').textContent = 'Continue →'
+  document.getElementById('btn-continue').onclick = () => {
+    if (spotifyPollTimer) { clearInterval(spotifyPollTimer); spotifyPollTimer = null }
+    goContinue()
+  }
+
+  const nav = document.getElementById('bottom-nav')
+  if (!document.getElementById('btn-skip-spotify')) {
+    const skipBtn = document.createElement('button')
+    skipBtn.id = 'btn-skip-spotify'
+    skipBtn.className = 'btn btn-skip'
+    skipBtn.textContent = 'Skip — connect later'
+    skipBtn.onclick = () => { if (spotifyPollTimer) clearInterval(spotifyPollTimer); goContinue() }
+    nav.insertBefore(skipBtn, nav.firstChild)
+  }
+
+  if (!isConnected) {
+    fetch('/api/setup/status')
+      .then(r => r.json())
+      .then(d => {
+        if (d.steps && d.steps.spotify) {
+          stepData.spotify = 'done'
+          renderStep6(document.getElementById('step-content'))
+        } else {
+          showSpotifyInstructions()
+        }
+      })
+      .catch(() => showSpotifyInstructions())
+  }
+}
+
+// startSpotifyOnMirror kept as no-op fallback (no longer used in UI)
+async function startSpotifyOnMirror() {}
+
+async function showSpotifyInstructions() {
+  const el = document.getElementById('spotify-content')
+  if (!el) return
+
+  // Fetch auth URL from server
+  let authUrl = null
+  try {
+    const d = await fetch('/api/setup/spotify-auth-url').then(r => r.json())
+    if (d.error) throw new Error(d.error)
+    authUrl = d.url
+  } catch (e) {
+    el.innerHTML = `<p style="color:#ff4444;text-align:center">Failed to load Spotify config: ${e.message}</p>`
+    return
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:8px">
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="background:#1DB954;color:#000;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">1</div>
+          <span style="font-size:14px;color:var(--white)">Tap to open Spotify login on this phone</span>
+        </div>
+        <a id="btn-spotify-open" href="${authUrl}" target="_blank"
+          style="display:block;background:#1DB954;color:#000;border:none;border-radius:10px;
+            padding:13px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;
+            text-decoration:none;margin-top:4px">
+          Open Spotify Login
+        </a>
+      </div>
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="background:#333;color:#fff;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">2</div>
+          <span style="font-size:14px;color:var(--white)">Sign in with your Spotify account</span>
+        </div>
+        <p style="font-size:12px;color:var(--dim);margin:0;line-height:1.5">
+          After signing in, your browser will show a page that <strong style="color:var(--white)">"can't be reached"</strong>. That's expected.
+        </p>
+      </div>
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:18px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="background:#333;color:#fff;border-radius:50%;width:22px;height:22px;
+            display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">3</div>
+          <span style="font-size:14px;color:var(--white)">Copy the URL from the address bar and paste it below</span>
+        </div>
+        <p style="font-size:11px;color:var(--dim);margin:0 0 10px;line-height:1.5">
+          The URL will look like: <span style="color:var(--accent);font-family:monospace;font-size:11px">http://127.0.0.1:3001/callback?code=...</span>
+        </p>
+        <textarea id="spotify-url-input" placeholder="Paste the URL here..."
+          style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;border-radius:8px;
+            color:#fff;font-size:13px;padding:10px;resize:none;height:70px;font-family:monospace;
+            outline:none;line-height:1.4"
+          oninput="spotifyUrlChanged(this)"></textarea>
+        <div id="spotify-paste-error" style="color:#ff4444;font-size:12px;margin-top:6px;display:none"></div>
+      </div>
+
+      <button id="btn-spotify-submit" onclick="submitSpotifyUrl()"
+        style="width:100%;padding:14px;background:var(--accent);color:#000;border:none;border-radius:10px;
+          font-size:15px;font-weight:700;cursor:pointer;opacity:0.4;pointer-events:none">
+        Connect Spotify
+      </button>
+    </div>
+  `
+}
+
+function spotifyUrlChanged(el) {
+  const btn = document.getElementById('btn-spotify-submit')
+  const hasContent = el.value.trim().length > 10
+  btn.style.opacity = hasContent ? '1' : '0.4'
+  btn.style.pointerEvents = hasContent ? 'auto' : 'none'
+  document.getElementById('spotify-paste-error').style.display = 'none'
+}
+
+async function submitSpotifyUrl() {
+  const input = document.getElementById('spotify-url-input')
+  const btn   = document.getElementById('btn-spotify-submit')
+  const errEl = document.getElementById('spotify-paste-error')
+  const url   = input.value.trim()
+
+  if (!url) return
+  btn.disabled = true
+  btn.textContent = 'Connecting...'
+
+  try {
+    const res = await fetch('/api/setup/spotify-paste-url', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ url })
+    })
+    const data = await res.json()
+
+    if (!res.ok || data.error) {
+      errEl.textContent = data.error || 'Something went wrong'
+      errEl.style.display = 'block'
+      btn.disabled = false
+      btn.textContent = 'Connect Spotify'
+      return
+    }
+
+    stepData.spotify = 'done'
+    renderStep6(document.getElementById('step-content'))
+  } catch (e) {
+    errEl.textContent = 'Network error — check your connection'
+    errEl.style.display = 'block'
+    btn.disabled = false
+    btn.textContent = 'Connect Spotify'
+  }
+}
+
+function startSpotifyPoll() {
+  if (spotifyPollTimer) return
+  spotifyPollTimer = setInterval(async () => {
+    try {
+      const d = await fetch('/api/setup/status').then(r => r.json())
+      if (d.steps && d.steps.spotify) {
+        clearInterval(spotifyPollTimer); spotifyPollTimer = null
+        stepData.spotify = 'done'
+        renderStep6(document.getElementById('step-content'))
+      }
+    } catch (e) {}
+  }, 3000)
+}
+
+
+
+// ── STEP 7 — Test ────────────────────────────────────────────
+let testCount = 0
+
+function renderStep7(el) {
+  testCount = 0
+  el.innerHTML = `
+    <h1 class="step-title">Test Mira</h1>
+    <p class="step-desc">Let's make sure everything is working before we finish.</p>
+
+    <button class="test-btn" id="test-briefing" onclick="testBriefing()">
+      <span class="test-icon">▶</span>
+      <span class="test-label">Trigger Morning Briefing</span>
+      <span class="test-result" id="test-briefing-result"></span>
+    </button>
+    <button class="test-btn" id="test-weather" onclick="testWeather()">
+      <span class="test-icon">☀</span>
+      <span class="test-label">Check Weather</span>
+      <span class="test-result" id="test-weather-result"></span>
+    </button>
+    <button class="test-btn" id="test-voice" onclick="testVoice()">
+      <span class="test-icon">🤖</span>
+      <span class="test-label">Test Voice Response</span>
+      <span class="test-result" id="test-voice-result"></span>
+    </button>
+
+    <div class="info-card" style="margin-top:20px">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dimmer);margin-bottom:12px">Integration Status</div>
+      <div class="status-grid" id="status-grid">
+        <div class="status-item"><span class="status-dot"></span>Loading...</div>
+      </div>
+    </div>
+  `
+
+  setContinueEnabled(false)
+  document.getElementById('btn-continue').textContent = 'Almost done →'
+  document.getElementById('btn-continue').onclick = goContinue
+
+  loadStatusGrid()
+}
+
+async function testBriefing() {
+  const btn = document.getElementById('test-briefing')
+  const res = document.getElementById('test-briefing-result')
+  btn.style.pointerEvents = 'none'
+  res.textContent = 'Playing on mirror...'
+  try {
+    await fetch('/api/briefing', { method: 'POST' })
+    res.textContent = 'Playing on mirror ✓'
+    btn.classList.add('done')
+    onTestDone()
+  } catch (e) {
+    res.textContent = 'Error'
+    btn.style.pointerEvents = ''
+  }
+}
+
+async function testWeather() {
+  const btn = document.getElementById('test-weather')
+  const res = document.getElementById('test-weather-result')
+  btn.style.pointerEvents = 'none'
+  res.textContent = 'Fetching...'
+  try {
+    const data = await fetch('/api/weather').then(r => r.json())
+    res.textContent = `${data.temp}° · ${data.condition} · ${data.city}`
+    btn.classList.add('done')
+    onTestDone()
+  } catch (e) {
+    res.textContent = 'Error'
+    btn.style.pointerEvents = ''
+  }
+}
+
+async function testVoice() {
+  const btn = document.getElementById('test-voice')
+  const res = document.getElementById('test-voice-result')
+  btn.style.pointerEvents = 'none'
+  res.textContent = 'Asking Mira...'
+  try {
+    await fetch('/api/voice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'Hello Mira' })
+    })
+    res.textContent = 'Mira responded on mirror ✓'
+    btn.classList.add('done')
+    onTestDone()
+  } catch (e) {
+    res.textContent = 'Error'
+    btn.style.pointerEvents = ''
+  }
+}
+
+function onTestDone() {
+  testCount++
+  if (testCount >= 1) setContinueEnabled(true)
+}
+
+async function loadStatusGrid() {
+  const grid = document.getElementById('status-grid')
+  if (!grid) return
+  try {
+    const d = await fetch('/api/setup/status').then(r => r.json())
+    const items = [
+      ['WiFi',      d.steps.wifi],
+      ['Google',    d.steps.google],
+      ['WhatsApp',  d.steps.whatsapp],
+      ['Spotify',   d.steps.spotify],
+      ['Wake Word', d.steps.wakeWord],
+      ['API Keys',  d.steps.apiKeys],
+    ]
+    grid.innerHTML = items.map(([label, ok]) =>
+      `<div class="status-item ${ok ? 'ok' : ''}">
+        <span class="status-dot"></span>${label} ${ok ? '✓' : '–'}
+      </div>`
+    ).join('')
+  } catch (e) {}
+}
+
+// ── STEP 8 — Complete ───────────────────────────────────────
+function renderStep8(el) {
+  const name = (stepData.profile && stepData.profile.name) || 'Friend'
+  el.innerHTML = `
+    <div style="text-align:center">
+      <div class="complete-check">✓</div>
+      <div class="complete-name">Good morning, ${name}!</div>
+      <p class="step-desc" style="margin-top:8px">Your mirror is fully set up and ready to use.</p>
+    </div>
+
+    <div class="info-card" id="complete-status">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dimmer);margin-bottom:12px">Connected Services</div>
+      <div class="status-grid" id="complete-grid">
+        <div class="status-item"><span class="status-dot"></span>Loading...</div>
+      </div>
+    </div>
+
+    <div style="margin:20px 0">
+      <p style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dimmer);margin-bottom:12px;text-align:center">Try saying</p>
+      <div class="commands-row">
+        <span class="command-pill">Hey Mira, good morning</span>
+        <span class="command-pill">Hey Mira, what's my day?</span>
+        <span class="command-pill">Hey Mira, play music</span>
+      </div>
+    </div>
+
+    <button class="btn-view-mirror" onclick="viewMirror()">View your Mirror →</button>
+    <p style="font-size:12px;color:var(--dimmer);text-align:center;margin-top:16px">
+      You can return to this setup page anytime at:<br>
+      <span style="color:var(--accent)">${window.location.origin}/setup</span>
+    </p>
+  `
+
+  // Hide bottom nav
+  document.getElementById('bottom-nav').style.display = 'none'
+
+  // Mark complete on server
+  fetch('/api/setup/complete', { method: 'POST' }).catch(() => {})
+
+  // Load status grid
+  fetch('/api/setup/status')
+    .then(r => r.json())
+    .then(d => {
+      const grid = document.getElementById('complete-grid')
+      if (!grid) return
+      const items = [
+        ['WiFi',     d.steps.wifi],
+        ['Google',   d.steps.google],
+        ['WhatsApp', d.steps.whatsapp],
+        ['Spotify',  d.steps.spotify],
+      ]
+      grid.innerHTML = items.map(([label, ok]) =>
+        `<div class="status-item ${ok ? 'ok' : ''}">
+          <span class="status-dot"></span>${label} ${ok ? '✓' : '–'}
+        </div>`
+      ).join('')
+    })
+    .catch(() => {})
+}
+
+function viewMirror() {
+  window.location.href = window.location.origin + '/'
+}
+</script>
+</body>
+</html>

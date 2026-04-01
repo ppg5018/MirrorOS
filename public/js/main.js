@@ -476,7 +476,7 @@ async function fetchGmail() {
       const warn = document.createElement('div')
       warn.className = 'notif-auth-warn'
       warn.style.cssText = 'font-size:10px;color:rgba(255,100,100,0.7);padding:4px 0 8px;font-family:var(--font-mono)'
-      warn.textContent = '⚠ Google auth expired — run: node server/google-auth.js'
+      warn.textContent = '⚠ Google auth expired — reconnect from companion app'
       widget.appendChild(warn)
       return
     }
@@ -737,6 +737,147 @@ if (typeof socket !== 'undefined') {
   })
 }
 
+// ── Screensaver ──────────────────────────
+if (typeof socket !== 'undefined') {
+  socket.on('screensaver:enter', () => window.screensaver && window.screensaver.enter())
+  socket.on('screensaver:exit',  () => window.screensaver && window.screensaver.exit())
+  socket.on('screensaver:library-updated', () => window.screensaver && window.screensaver.onLibraryUpdated())
+
+  // PIR motion and wake word both exit screensaver
+  socket.on('motion', () => window.screensaver && window.screensaver.isActive() && window.screensaver.exit())
+  socket.on('voice-state', (data) => {
+    if (data.state === 'listening' && window.screensaver && window.screensaver.isActive()) {
+      window.screensaver.exit()
+    }
+  })
+}
+
+// ── Morning briefing indicator ──────────────
+function showBriefingIndicator() {
+  if (document.getElementById('briefing-indicator')) return
+  const el = document.createElement('div')
+  el.id = 'briefing-indicator'
+  el.innerHTML = '<div class="briefing-dot"></div><span>Morning briefing...</span>'
+  document.body.appendChild(el)
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')))
+}
+
+function hideBriefingIndicator() {
+  const el = document.getElementById('briefing-indicator')
+  if (!el) return
+  el.classList.remove('visible')
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el) }, 800)
+}
+
+document.addEventListener('briefing:starting', () => {
+  console.log('[main] morning briefing starting')
+  const aiWidget = document.getElementById('widget-ai') ||
+    document.getElementById('ai-bar') ||
+    document.querySelector('.ai-pill') ||
+    document.querySelector('[id*="ai"]')
+  if (aiWidget) aiWidget.classList.add('briefing-active')
+  showBriefingIndicator()
+})
+
+document.addEventListener('briefing:complete', () => {
+  console.log('[main] morning briefing complete')
+  const aiWidget = document.getElementById('widget-ai') ||
+    document.getElementById('ai-bar') ||
+    document.querySelector('.ai-pill') ||
+    document.querySelector('[id*="ai"]')
+  if (aiWidget) aiWidget.classList.remove('briefing-active')
+  hideBriefingIndicator()
+})
+
+// ── WhatsApp real-time events ───────────────
+if (typeof socket !== 'undefined') {
+  socket.on('whatsapp:message', (data) => {
+    const notifList = document.getElementById('widget-notifications')
+    if (!notifList) return
+
+    const item = document.createElement('div')
+    item.className = 'notif-item notif-new'
+    item.innerHTML = `
+      <div class="notif-icon">${SVG_ICONS.whatsapp}</div>
+      <div class="notif-content">
+        <div class="notif-sender">${data.from}</div>
+        <div class="notif-message">${data.text}</div>
+      </div>
+      <span class="notif-time">now</span>
+    `
+    const firstItem = notifList.querySelector('.notif-item')
+    if (firstItem) notifList.insertBefore(item, firstItem)
+    else notifList.appendChild(item)
+
+    const items = notifList.querySelectorAll('.notif-item')
+    if (items.length > 5) items[items.length - 1].remove()
+
+    notifList.classList.add('widget-highlight')
+    setTimeout(() => notifList.classList.remove('widget-highlight'), 1000)
+  })
+
+  socket.on('whatsapp:status', (data) => {
+    const dot = document.getElementById('conn-dot-whatsapp')
+    if (dot) {
+      dot.className = 'conn-dot ' + (data.connected ? 'active' : '')
+    }
+  })
+
+  socket.on('whatsapp:qr', () => {
+    console.log('[WhatsApp] QR received — scan from phone')
+  })
+}
+
+// ── Setup check — show QR overlay on fresh install ──────────
+fetch('/api/setup/qr-data')
+  .then(r => r.json())
+  .then(data => { if (!data.setupComplete) showSetupScreen(data.setupURL) })
+  .catch(() => {})
+
+function showSetupScreen(setupURL) {
+  const overlay = document.createElement('div')
+  overlay.id = 'setup-overlay'
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'background:#000',
+    'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center',
+    'z-index:99999', 'font-family:system-ui,sans-serif'
+  ].join(';')
+
+  overlay.innerHTML = `
+    <p style="color:#4ecdc4;font-size:11px;letter-spacing:4px;margin-bottom:24px;text-transform:uppercase">Mira Setup</p>
+    <h2 style="color:white;font-size:28px;font-weight:200;margin:0 0 8px">Scan to set up your mirror</h2>
+    <p style="color:rgba(255,255,255,0.4);font-size:14px;margin:0 0 40px">Open the camera app on your phone</p>
+    <canvas id="setup-qr-canvas" style="border-radius:12px"></canvas>
+    <p style="color:rgba(255,255,255,0.25);font-size:12px;margin-top:24px">${setupURL}</p>
+  `
+  document.body.appendChild(overlay)
+
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js'
+  script.onload = () => {
+    QRCode.toCanvas(
+      document.getElementById('setup-qr-canvas'),
+      setupURL,
+      { width: 220, margin: 2, color: { dark: '#000000', light: '#ffffff' } }
+    )
+  }
+  document.head.appendChild(script)
+
+  if (typeof socket !== 'undefined') {
+    socket.on('setup:complete', (data) => {
+      overlay.innerHTML = `
+        <div style="text-align:center">
+          <div style="width:80px;height:80px;border-radius:50%;background:rgba(78,205,196,0.15);border:2px solid #4ecdc4;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px;color:#4ecdc4">✓</div>
+          <h2 style="color:white;font-size:28px;font-weight:200;margin:0 0 8px">Welcome, ${data.name || 'to Mira'}!</h2>
+          <p style="color:rgba(255,255,255,0.4);margin:0">Loading your dashboard...</p>
+        </div>
+      `
+      setTimeout(() => overlay.remove(), 3000)
+    })
+  }
+}
+
 fetchAll()
 fetchNews()
 
@@ -745,3 +886,5 @@ setInterval(fetchNews, 15 * 60 * 1000)
 
 initTestInput()
 initWallpaper()
+
+if (window.screensaver) window.screensaver.init()

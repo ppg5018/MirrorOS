@@ -41,6 +41,12 @@ SPOTIFY RULES:
 - Never say "I cannot play music" — always try an action.
 - Never mention tokens, OAuth, or API to the user.
 
+WHATSAPP RULES:
+- get_whatsapp_messages with no input → returns all unread messages across contacts
+- get_whatsapp_messages with contact:'Mom' → messages from Mom only
+- If WhatsApp not connected → tell user to scan the QR code shown in the terminal or at /api/whatsapp/qr
+- Never say you cannot read WhatsApp — always try the tool first.
+
 SLIDESHOW RULES:
 - "next photo" / "skip photo"   → control_slideshow action:next
 - "previous photo"               → control_slideshow action:prev
@@ -71,7 +77,11 @@ KARAOKE RULES:
 - "lyrics for this song" / "open karaoke"                → karaoke_control action: fetch_lyrics
 - "play [song] in karaoke" / "play [song] with lyrics"   → karaoke_control action: play, query=song name
 - "close karaoke" / "exit lyrics" / "go back"            → karaoke_control action: close
-- Never say you can't show lyrics — always try.`
+- Never say you can't show lyrics — always try.
+
+SCREENSAVER RULES:
+- "screensaver" / "start screensaver" / "go to sleep" / "sleep mode" / "screen off" / "lights off" / "start sleep mode" / "goodnight mirror" → screensaver_control action: enter
+- "wake up" / "I'm back" / "exit screensaver" / "turn on" → screensaver_control action: exit`
 
 // ── Conversation memory ──────────────────────────────────────
 const MAX_EXCHANGES = 5
@@ -158,7 +168,8 @@ const TOOL_TO_WIDGET = {
   get_quote:             'quote',
   control_slideshow:     null,
   fitness_control:       'fitness',
-  karaoke_control:       null
+  karaoke_control:       null,
+  screensaver_control:   null
 }
 
 const tools = [
@@ -348,6 +359,21 @@ const tools = [
         },
         workoutId: { type: 'string', description: 'Workout ID for start action (e.g. hiit-circuit, 5-minute-quickie)' },
         weightKg: { type: 'number', description: 'User weight in kg for calorie calculation' }
+      },
+      required: ['action']
+    }
+  },
+  {
+    name: 'screensaver_control',
+    description: 'Control screensaver mode on the mirror — enter to dim and show video wallpaper, exit to wake back up',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['enter', 'exit'],
+          description: 'enter to start screensaver, exit to stop'
+        }
       },
       required: ['action']
     }

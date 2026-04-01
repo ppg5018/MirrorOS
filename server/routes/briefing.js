@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { triggerBriefing, getNextBriefingTime } = require('../scheduler')
+const { triggerBriefing, getBriefingStatus, getNextBriefingTime } = require('../scheduler')
 const logger = require('../logger')
 
 // POST /api/briefing — trigger via curl or companion app (e.g. curl -X POST localhost:3000/api/briefing)
@@ -24,9 +24,10 @@ router.get('/trigger', async (req, res) => {
   res.json(result)
 })
 
-// GET /api/briefing/status — next scheduled time
+// GET /api/briefing/status — next scheduled time + PIR trigger state
 router.get('/status', (req, res) => {
   res.json({
+    ...getBriefingStatus(),
     nextBriefing: getNextBriefingTime(),
     scheduledTime: process.env.BRIEFING_CRON || '0 7 * * *',
     timezone: 'Asia/Kolkata'

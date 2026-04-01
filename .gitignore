@@ -11,3 +11,8 @@ public/uploads/thumbs/
 data/gifs/
 data/exercises.json
 data/workout-history.ndjson
+config/whatsapp-auth/
+config/user.json
+config/setup-complete.json
+config/wakeword.json
+config/wifi.json

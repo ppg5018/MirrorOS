@@ -1,0 +1,72 @@
+#screensaver-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  /* width/height set by JS to compensate for page zoom */
+  background: #000;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+#screensaver-overlay.visible {
+  display: flex;
+  opacity: 1;
+}
+
+/* Centered contained box — pure black surround, video at native ratio */
+#screensaver-video {
+  display: block;
+  max-width: 72vw;
+  max-height: 72vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  background: #000;
+  border-radius: 4px;
+}
+
+/* CSS fallback when no video */
+#screensaver-fallback {
+  display: none;
+  width: 72vw;
+  height: 72vh;
+  background: #0a0a1a;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: white;
+  border-radius: 50%;
+  animation: twinkle var(--duration) ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 1; }
+}
+
+#screensaver-cat {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.7;
+}
+
+#cat-tail {
+  transform-origin: top left;
+  animation: tailWag 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes tailWag {
+  0%   { transform: rotate(-10deg); }
+  100% { transform: rotate(10deg); }
+}

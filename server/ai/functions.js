@@ -30,13 +30,26 @@ const functions = {
   },
 
   get_whatsapp_messages: async (input) => {
-    const data = await get('/api/whatsapp')
-    if (input.contact) {
-      data.contacts = data.contacts.filter(c =>
-        c.name.toLowerCase().includes(input.contact.toLowerCase())
-      )
+    const {
+      getMessages,
+      getMessagesFromContact,
+      getConnectionStatus
+    } = require('../whatsapp/client')
+
+    if (!getConnectionStatus()) {
+      return {
+        connected: false,
+        error: 'WhatsApp not connected. Ask user to scan QR at /api/whatsapp/qr'
+      }
     }
-    return data
+
+    if (input.contact) {
+      const data = getMessagesFromContact(input.contact)
+      if (!data) return { error: `No messages found from ${input.contact}` }
+      return data
+    }
+
+    return getMessages()
   },
 
   get_tasks: async (_input) => {
@@ -290,6 +303,11 @@ const functions = {
     }
     // pause, resume, skip, stop
     return post('/api/fitness/action', { action: input.action })
+  },
+
+  screensaver_control: async (input, io) => {
+    if (io) io.emit('screensaver:' + input.action)
+    return { success: true, message: input.action === 'enter' ? 'Screensaver started.' : 'Screensaver stopped.' }
   },
 
   karaoke_control: async (input, io) => {

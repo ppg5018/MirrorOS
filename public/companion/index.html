@@ -844,8 +844,11 @@
                                 </div>
                                 <div style="height:1px; background:#1A1A1A;"></div>
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="color:#888; font-size:13px;">🟢 Google Calendar</span> <span
-                                        style="color:#4A9CF0; font-size:11px;">Active</span>
+                                    <span style="color:#888; font-size:13px;">🟢 Google Calendar</span>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <span style="color:#4A9CF0; font-size:11px;">Active</span>
+                                        <button onclick="reconnectGoogle(this)" style="background:#1a1a1a;border:1px solid #333;color:#aaa;font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;">Reconnect</button>
+                                    </div>
                                 </div>
                                 <div style="height:1px; background:#1A1A1A;"></div>
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1242,6 +1245,36 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Screensaver / Wallpapers Tab (mobile) -->
+                    <div class="tab-content" data-tab="screensaver" data-device="mobile">
+                        <div class="section-card fade-in">
+                            <div class="label-caps" style="margin-bottom:8px;">Upload Wallpaper</div>
+                            <div style="font-size:11px; color:#555; margin-bottom:12px;">MP4 or WEBM · Max 50MB · Auto-converted to 720p</div>
+                            <div id="m-upload-dropzone" style="border:2px dashed rgba(74,240,196,0.3); border-radius:10px; padding:24px; text-align:center; cursor:pointer;">
+                                <div style="font-size:30px; margin-bottom:8px;">🎬</div>
+                                <div style="font-size:13px; color:#888;">Tap to choose video</div>
+                                <input type="file" id="m-wallpaper-file-input" accept="video/mp4,video/webm" style="display:none">
+                            </div>
+                            <div id="m-upload-progress" style="display:none; margin-top:12px;">
+                                <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                                    <div id="m-progress-fill" style="height:100%; background:#4AF0C4; border-radius:3px; transition:width 0.3s; width:0%"></div>
+                                </div>
+                                <div id="m-progress-label" style="font-size:11px; color:#888; margin-top:6px;">Uploading...</div>
+                            </div>
+                        </div>
+                        <div class="section-card fade-in-d1">
+                            <div class="label-caps" style="margin-bottom:12px;">Controls</div>
+                            <div style="display:flex; gap:10px;">
+                                <button id="m-btn-screensaver-start" style="flex:1; background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:10px; font-size:13px; font-weight:600; cursor:pointer;">▶ Start</button>
+                                <button id="m-btn-screensaver-stop" style="flex:1; background:#1A1A1A; color:#888; border:1px solid #333; border-radius:8px; padding:10px; font-size:13px; cursor:pointer;">■ Stop</button>
+                            </div>
+                        </div>
+                        <div class="section-card fade-in-d2">
+                            <div class="label-caps" style="margin-bottom:12px;">Library</div>
+                            <div id="m-wallpaper-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
+                            <div id="m-no-wallpapers" style="display:none; font-size:12px; color:#555; padding:8px 0;">No wallpapers yet. Upload one above!</div>
+                        </div>
+                    </div>
                 </div><!-- Toast -->
                 <div id="m-toast" class="toast-msg"></div><!-- Bottom Nav -->
                 <div
@@ -1265,6 +1298,11 @@
                         style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; padding:6px 0; border-top:2px solid transparent; color:#444;">
                         <i data-lucide="heart-pulse" style="width:20px; height:20px;"></i> <span
                             style="font-size:10px;">Fitness</span>
+                    </div>
+                    <div class="tab-btn" data-tab="screensaver" data-device="mobile" onclick="switchTab(this)"
+                        style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; padding:6px 0; border-top:2px solid transparent; color:#444;">
+                        <i data-lucide="monitor-play" style="width:20px; height:20px;"></i> <span
+                            style="font-size:10px;">Wallpapers</span>
                     </div>
                 </div>
             </div>
@@ -1299,6 +1337,10 @@
                         <div class="desktop-nav-item" data-tab="fitness" data-device="desktop"
                             onclick="switchDesktopTab(this)">
                             <i data-lucide="heart-pulse" style="width:18px; height:18px;"></i> <span>Fitness</span>
+                        </div>
+                        <div class="desktop-nav-item" data-tab="screensaver" data-device="desktop"
+                            onclick="switchDesktopTab(this)">
+                            <i data-lucide="monitor-play" style="width:18px; height:18px;"></i> <span>Wallpapers</span>
                         </div>
                     </div>
                     <div style="padding:16px 20px; border-top:1px solid #1A1A1A;">
@@ -2203,6 +2245,42 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Desktop Screensaver / Wallpapers Tab -->
+                    <div class="tab-content" data-tab="screensaver" data-device="desktop">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                            <div>
+                                <div class="section-card fade-in">
+                                    <div class="label-caps" style="margin-bottom:8px;">Upload Wallpaper</div>
+                                    <div style="font-size:11px; color:#555; margin-bottom:14px;">MP4 or WEBM · Max 50MB · Auto-converted to 720p</div>
+                                    <div id="d-upload-dropzone" style="border:2px dashed rgba(74,240,196,0.3); border-radius:10px; padding:32px; text-align:center; cursor:pointer; transition:border-color 0.2s;">
+                                        <div style="font-size:36px; margin-bottom:10px;">🎬</div>
+                                        <div style="font-size:14px; color:#888;">Click to choose video</div>
+                                        <input type="file" id="d-wallpaper-file-input" accept="video/mp4,video/webm" style="display:none">
+                                    </div>
+                                    <div id="d-upload-progress" style="display:none; margin-top:14px;">
+                                        <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                                            <div id="d-progress-fill" style="height:100%; background:#4AF0C4; border-radius:3px; transition:width 0.3s; width:0%"></div>
+                                        </div>
+                                        <div id="d-progress-label" style="font-size:12px; color:#888; margin-top:8px;">Uploading...</div>
+                                    </div>
+                                </div>
+                                <div class="section-card fade-in-d1">
+                                    <div class="label-caps" style="margin-bottom:14px;">Controls</div>
+                                    <div style="display:flex; gap:12px;">
+                                        <button id="d-btn-screensaver-start" style="flex:1; background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:12px; font-size:14px; font-weight:600; cursor:pointer;">▶ Start Screensaver</button>
+                                        <button id="d-btn-screensaver-stop" style="flex:1; background:#1A1A1A; color:#888; border:1px solid #333; border-radius:8px; padding:12px; font-size:14px; cursor:pointer;">■ Stop</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="section-card fade-in">
+                                    <div class="label-caps" style="margin-bottom:14px;">Wallpaper Library</div>
+                                    <div id="d-wallpaper-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
+                                    <div id="d-no-wallpapers" style="display:none; font-size:13px; color:#555; padding:8px 0;">No wallpapers yet. Upload one above!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2624,6 +2702,26 @@
     }
   });
 
+  // ─── Google Reconnect ────────────────────────────────────────
+  window.reconnectGoogle = async function(btn) {
+    btn.textContent = 'Opening...'
+    btn.disabled = true
+    try {
+      const res  = await fetch('/api/setup/google-open-on-device', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) {
+        btn.textContent = 'Error'
+        setTimeout(() => { btn.textContent = 'Reconnect'; btn.disabled = false }, 2000)
+      } else {
+        btn.textContent = 'Check mirror'
+        setTimeout(() => { btn.textContent = 'Reconnect'; btn.disabled = false }, 4000)
+      }
+    } catch (e) {
+      btn.textContent = 'Failed'
+      setTimeout(() => { btn.textContent = 'Reconnect'; btn.disabled = false }, 2000)
+    }
+  }
+
   // ─── Status Refresh ──────────────────────────────────────────
   async function refreshStatus() {
     try {
@@ -2796,6 +2894,146 @@
 
   refreshStatus();
 
+})();
+</script>
+
+<script>
+// ── Screensaver / Wallpapers tab ─────────────────────────────
+(function () {
+  function buildCard(v, prefix) {
+    const card = document.createElement('div')
+    card.style.cssText = 'border-radius:10px; overflow:hidden; background:rgba(255,255,255,0.05); position:relative; aspect-ratio:16/9; cursor:pointer;'
+    const img = document.createElement('img')
+    img.src = v.thumbnail || '/img/video-placeholder.jpg'
+    img.alt = v.filename
+    img.style.cssText = 'width:100%; height:100%; object-fit:cover;'
+    img.onerror = function () { this.src = ''; this.style.background = '#111'; }
+    const del = document.createElement('button')
+    del.dataset.file = v.filename
+    del.textContent = '✕'
+    del.style.cssText = 'position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.7); border:none; color:#ff6b6b; border-radius:50%; width:26px; height:26px; font-size:13px; cursor:pointer;'
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      await fetch('/api/screensaver/' + encodeURIComponent(e.target.dataset.file), { method: 'DELETE' })
+      loadLibrary()
+    })
+    const label = document.createElement('div')
+    label.textContent = v.filename
+    label.style.cssText = 'position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,0.8)); color:#fff; font-size:10px; padding:4px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'
+    card.appendChild(img)
+    card.appendChild(del)
+    card.appendChild(label)
+    return card
+  }
+
+  async function loadLibrary() {
+    try {
+      const res = await fetch('/api/screensaver/list')
+      const videos = await res.json()
+      ;['m', 'd'].forEach(prefix => {
+        const grid = document.getElementById(prefix + '-wallpaper-grid')
+        const empty = document.getElementById(prefix + '-no-wallpapers')
+        if (!grid) return
+        grid.innerHTML = ''
+        if (!videos.length) {
+          if (empty) { empty.style.display = 'block'; grid.style.display = 'none' }
+          return
+        }
+        if (empty) { empty.style.display = 'none'; grid.style.display = 'grid' }
+        videos.forEach(v => grid.appendChild(buildCard(v, prefix)))
+      })
+    } catch (e) { /* silent */ }
+  }
+
+  async function uploadWallpaper(file, prefix) {
+    const dropzone = document.getElementById(prefix + '-upload-dropzone')
+    const progressDiv = document.getElementById(prefix + '-upload-progress')
+    const fill = document.getElementById(prefix + '-progress-fill')
+    const label = document.getElementById(prefix + '-progress-label')
+
+    dropzone.style.display = 'none'
+    progressDiv.style.display = 'block'
+    fill.style.width = '0%'
+    label.textContent = 'Uploading...'
+
+    const fd = new FormData()
+    fd.append('video', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/screensaver/upload')
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 80)
+        fill.style.width = pct + '%'
+        label.textContent = pct < 80 ? 'Uploading... ' + pct + '%' : 'Converting to 720p...'
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        fill.style.width = '100%'
+        label.textContent = 'Done!'
+        setTimeout(() => {
+          progressDiv.style.display = 'none'
+          dropzone.style.display = ''
+          loadLibrary()
+        }, 1200)
+      } else {
+        label.textContent = 'Upload failed. Try again.'
+        setTimeout(() => { progressDiv.style.display = 'none'; dropzone.style.display = '' }, 2000)
+      }
+    }
+    xhr.onerror = () => { label.textContent = 'Error. Check connection.' }
+    xhr.send(fd)
+  }
+
+  // Wire up mobile and desktop
+  ;['m', 'd'].forEach(prefix => {
+    const dropzone = document.getElementById(prefix + '-upload-dropzone')
+    const fileInput = document.getElementById(prefix + '-wallpaper-file-input')
+    if (!dropzone || !fileInput) return
+
+    dropzone.addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', (e) => {
+      const f = e.target.files[0]
+      if (f) { uploadWallpaper(f, prefix); fileInput.value = '' }
+    })
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = '#4AF0C4' })
+    dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = 'rgba(74,240,196,0.3)' })
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault()
+      dropzone.style.borderColor = 'rgba(74,240,196,0.3)'
+      const f = e.dataTransfer.files[0]
+      if (f) uploadWallpaper(f, prefix)
+    })
+
+    const startBtn = document.getElementById(prefix + '-btn-screensaver-start')
+    const stopBtn  = document.getElementById(prefix + '-btn-screensaver-stop')
+    if (startBtn) startBtn.addEventListener('click', () =>
+      fetch('/api/screensaver/trigger', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'enter' }) }))
+    if (stopBtn)  stopBtn.addEventListener('click', () =>
+      fetch('/api/screensaver/trigger', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'exit' }) }))
+  })
+
+  // Refresh library when socket notifies
+  if (window._mirrorSocket) {
+    window._mirrorSocket.on('screensaver:library-updated', loadLibrary)
+  } else {
+    document.addEventListener('mirrorSocketReady', () => {
+      window._mirrorSocket && window._mirrorSocket.on('screensaver:library-updated', loadLibrary)
+    })
+  }
+
+  // Hook into tab switch to load library when Wallpapers tab opened
+  const _origSwitch = window.switchTab
+  window.switchTab = function (el) {
+    if (_origSwitch) _origSwitch(el)
+    if (el.dataset.tab === 'screensaver') loadLibrary()
+  }
+  const _origSwitchDesktop = window.switchDesktopTab
+  window.switchDesktopTab = function (el) {
+    if (_origSwitchDesktop) _origSwitchDesktop(el)
+    if (el.dataset.tab === 'screensaver') loadLibrary()
+  }
 })();
 </script>
 </body>

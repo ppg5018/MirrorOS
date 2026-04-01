@@ -13,18 +13,25 @@ const { google } = require('googleapis')
 const fs   = require('fs')
 const path = require('path')
 
-const TOKEN_PATH   = path.join(__dirname, '../config/google-token.json')
-const REDIRECT_URI = 'http://localhost:3000/auth/callback'
+const TOKEN_PATH = path.join(__dirname, '../config/google-token.json')
 
 const SCOPES = [
+  'openid',
+  'profile',
+  'email',
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/youtube.force-ssl',
 ]
 
 function getAuthClient() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return null
   if (!fs.existsSync(TOKEN_PATH)) return null
+
+  // localhost redirect — works from Pi's own browser or CLI setup
+  const REDIRECT_URI = `http://localhost:${process.env.PORT || 3000}/auth/google/callback`
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -46,7 +53,25 @@ function getAuthClient() {
   return oauth2Client
 }
 
-module.exports = { getAuthClient }
+function getGoogleAuthURL() {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return null
+
+  const REDIRECT_URI = `http://localhost:${process.env.PORT || 3000}/auth/google/callback`
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    REDIRECT_URI
+  )
+
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    prompt: 'consent'
+  })
+}
+
+module.exports = { getAuthClient, getGoogleAuthURL }
 
 // ─── CLI setup: node server/google-auth.js ───────────────────────────────────
 if (require.main === module) {
@@ -60,25 +85,31 @@ if (require.main === module) {
     process.exit(1)
   }
 
-  const oauth2Client = new google.auth.OAuth2(id, secret, REDIRECT_URI)
+  const { getGoogleRedirectURI } = require('./utils/network')
+  const redirectURI = getGoogleRedirectURI()
+
+  const oauth2Client = new google.auth.OAuth2(id, secret, redirectURI)
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',     // force re-consent so we always get a refresh_token
+    prompt: 'consent',
     scope: SCOPES,
   })
 
   console.log('\n╔══ MirrorOS — Google Auth Setup ══════════════════════════════╗')
   console.log('║                                                              ║')
   console.log('║  1. Make sure the server is running:  npm start             ║')
-  console.log('║  2. Open this URL in your browser:                          ║')
+  console.log('║  2. Add this redirect URI to Google Cloud Console:          ║')
+  console.log('║                                                              ║')
+  console.log(`║  ${redirectURI.padEnd(62)}║`)
+  console.log('║                                                              ║')
+  console.log('║  3. Open this URL in your browser:                          ║')
   console.log('║                                                              ║')
   console.log('╚══════════════════════════════════════════════════════════════╝\n')
   console.log(url)
   console.log('\nAfter signing in, the token will be saved automatically.')
   console.log('You should see "MirrorOS Connected!" in the browser.\n')
 
-  // Try to auto-open the browser
   import('open')
     .then(m => {
       console.log('Opening browser...')

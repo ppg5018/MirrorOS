@@ -55,8 +55,23 @@ SCRIPT_DIR      = os.path.dirname(os.path.abspath(__file__))
 # Default is 'picovoice' until a custom "hey mirror" .ppn model is trained.
 WAKE_KEYWORD    = os.environ.get('WAKE_KEYWORD', 'jarvis')  # fallback built-in for testing
 
-# Path to custom "Hey Mirror" .ppn model
-# Supports both WAKE_WORD_PATH (brief spec) and KEYWORD_PATH (legacy)
+# Path to custom .ppn model — read from config/wakeword.json if present,
+# then fall back to env vars WAKE_WORD_PATH / KEYWORD_PATH.
+_wakeword_cfg_path = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), '../../config/wakeword.json')
+)
+if os.path.exists(_wakeword_cfg_path):
+    try:
+        with open(_wakeword_cfg_path) as _f:
+            _wakeword_cfg = json.load(_f)
+        _ppn_file = _wakeword_cfg.get('file', '')
+        if _ppn_file and not os.environ.get('WAKE_WORD_PATH') and not os.environ.get('KEYWORD_PATH'):
+            os.environ['KEYWORD_PATH'] = os.path.normpath(
+                os.path.join(SCRIPT_DIR, 'wakewords', _ppn_file)
+            )
+    except Exception as _e:
+        pass  # Malformed wakeword.json — fall through to env/built-in
+
 KEYWORD_PATH    = os.environ.get('WAKE_WORD_PATH', '') or os.environ.get('KEYWORD_PATH', '')
 
 def ts():

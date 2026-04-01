@@ -3,6 +3,7 @@ const router  = express.Router()
 const { getNextBriefingTime } = require('../scheduler')
 const { getAuthClient } = require('../google-auth')
 const { isConnected: spotifyConnected, getUserInfo: spotifyUser } = require('../helpers/spotify-auth')
+const { getConnectionStatus: whatsappConnected } = require('../whatsapp/client')
 const fs   = require('fs')
 const path = require('path')
 
@@ -54,7 +55,7 @@ router.get('/', (req, res) => {
       youtube:  { connected: youtubeConnected, source: 'google_oauth' },
       weather:  { connected: !!process.env.OPENWEATHER_API_KEY },
       claude:   { connected: !!process.env.CLAUDE_API_KEY },
-      whatsapp: { connected: false },
+      whatsapp: { connected: whatsappConnected() },
       spotify:  { connected: spotifyConnected(), user: spotifyUser() }
     }
   })

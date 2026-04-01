@@ -16,6 +16,7 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="css/mirror.css" />
+  <link rel="stylesheet" href="css/screensaver.css" />
 </head>
 
 <body>
@@ -150,10 +151,10 @@
     <!-- Column divider -->
     <div class="col-divider"></div>
 
-    <!-- ════════ COL 2: AI Panel + Calendar ════════ -->
+    <!-- ════════ COL 2: AI Panel + Ambient Art ════════ -->
     <div class="col col-center">
 
-      <!-- AI Assistant Card -->
+      <!-- AI Assistant Card (schedule merged inside) -->
       <div class="ai-card" id="widget-ai-bar">
         <div class="ai-corner ai-corner-tl"></div>
         <div class="ai-corner ai-corner-tr"></div>
@@ -166,6 +167,11 @@
         </div>
         <div class="ai-card-greeting">Good morning, Arjun</div>
         <div class="ai-card-hint">Say <span>"Hey Mirror"</span> to begin</div>
+
+        <!-- Today's Schedule — merged inside AI card -->
+        <div class="schedule-widget ai-schedule-section mirror-widget" id="widget-calendar">
+          <div class="ai-schedule-label">Today's Schedule</div>
+        </div>
 
         <div class="ai-waveform" id="ai-waveform">
           <div class="wf-bar"></div>
@@ -184,9 +190,25 @@
         </div>
       </div>
 
-      <!-- Today's Schedule -->
-      <div class="schedule-widget mirror-widget" id="widget-calendar" style="padding-left:20px">
-        <div class="widget-label">Today's Schedule</div>
+      <!-- Ambient Art — fills remaining space in center column -->
+      <div class="ambient-art-widget" id="widget-wallpaper">
+        <div class="widget-label">Ambient Art</div>
+        <div class="ambient-art-frame" id="wallpaper-drop" onclick="document.getElementById('wallpaper-input').click()">
+          <div class="wallpaper-thumb" id="wallpaper-thumb"></div>
+
+          <!-- Corner brackets -->
+          <div class="art-corner art-corner-tl"></div>
+          <div class="art-corner art-corner-tr"></div>
+          <div class="art-corner art-corner-bl"></div>
+          <div class="art-corner art-corner-br"></div>
+
+          <div class="ambient-art-empty">
+            <span class="wallpaper-drop-icon">⊞</span>
+            <span id="wallpaper-drop-text" class="wallpaper-drop-text">Drop image or click</span>
+          </div>
+          <input type="file" id="wallpaper-input" accept="image/*" style="display:none">
+        </div>
+        <div class="wallpaper-clear" id="wallpaper-clear">✕ Remove</div>
       </div>
 
     </div>
@@ -194,7 +216,7 @@
     <!-- Column divider -->
     <div class="col-divider"></div>
 
-    <!-- ════════ COL 3: Notifications + Music + Wallpaper ════════ -->
+    <!-- ════════ COL 3: Notifications + Music + Fitness ════════ -->
     <div class="col col-right mirror-widget">
 
       <!-- Notifications -->
@@ -286,28 +308,6 @@
         onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.85'">
       </div>
 
-      <!-- Ambient Art -->
-      <div class="ambient-art-widget" id="widget-wallpaper">
-        <div class="widget-label">Ambient Art</div>
-        <div class="ambient-art-frame" id="wallpaper-drop" onclick="document.getElementById('wallpaper-input').click()">
-          <div class="wallpaper-thumb" id="wallpaper-thumb"></div>
-
-          <!-- Corner brackets -->
-          <div class="art-corner art-corner-tl"></div>
-          <div class="art-corner art-corner-tr"></div>
-          <div class="art-corner art-corner-bl"></div>
-          <div class="art-corner art-corner-br"></div>
-
-
-          <div class="ambient-art-empty">
-            <span class="wallpaper-drop-icon">⊞</span>
-            <span id="wallpaper-drop-text" class="wallpaper-drop-text">Drop image or click</span>
-          </div>
-          <input type="file" id="wallpaper-input" accept="image/*" style="display:none">
-        </div>
-        <div class="wallpaper-clear" id="wallpaper-clear">✕ Remove</div>
-      </div>
-
     </div>
 
   </div><!-- /mirror-grid -->
@@ -362,6 +362,7 @@
   <script src="js/spotify-player.js"></script>
   <script src="js/fitness-widget.js"></script>
   <script src="js/modes/karaoke.js"></script>
+  <script src="js/screensaver.js"></script>
   <script src="js/main.js"></script>
 </body>
 
