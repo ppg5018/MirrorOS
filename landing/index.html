@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-IN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,14 +30,13 @@
 <meta name="twitter:image" content="https://www.getmira.co.in/assets/main.png">
 <meta name="twitter:image:alt" content="Mira AI smart mirror">
 
-<!-- ============ ICONS ============ -->
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<!-- ============ ICONS (inline SVG — no external file, no 404) ============ -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000000'/%3E%3Ctext x='32' y='45' font-family='monospace' font-size='40' font-weight='700' text-anchor='middle' fill='%234af0c4'%3EM%3C/text%3E%3C/svg%3E">
 
 <!-- ============ FONTS ============ -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="image" href="https://www.getmira.co.in/assets/pics/morning.png">
+<link rel="preload" as="image" href="/assets/pics/morning.png">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- ============ STRUCTURED DATA ============ -->
@@ -83,8 +82,6 @@
         "@type": "Offer",
         "availability": "https://schema.org/PreOrder",
         "priceCurrency": "INR",
-        "price": "0",
-        "priceValidUntil": "2026-12-31",
         "url": "https://www.getmira.co.in/#waitlist-section",
         "seller": { "@id": "https://www.getmira.co.in/#organization" }
       }
@@ -136,7 +133,7 @@
   --bg:#000;
   --accent:#4af0c4;
   --text:#f4f4f4;
-  --muted:#8a8a8a;
+  --muted:#9a9a9a;
   --line:#161616;
   --card:#0a0a0a;
 }
@@ -221,6 +218,15 @@ form.wl button{padding:16px;font-size:.9rem;cursor:pointer;border-radius:2px}
 .note{font-size:.78rem;color:var(--muted);margin-top:8px;text-align:center}
 .gift{font-family:'Space Mono',monospace;color:var(--accent);margin-top:18px}
 
+/* FAQ */
+.faq details{border:1px solid var(--line);padding:0 24px;margin-bottom:12px}
+.faq summary{font-family:'Space Mono',monospace;font-size:1.02rem;padding:20px 0;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--accent);font-size:1.4rem}
+.faq details[open] summary::after{content:"–"}
+.faq details[open] summary{color:var(--accent)}
+.faq p{color:#c4c4c4;padding:0 0 22px;max-width:760px}
+
 /* FOOTER */
 footer{padding:56px 0;text-align:center}
 footer .brand{font-size:1.4rem;display:block;margin-bottom:10px}
@@ -264,7 +270,7 @@ footer p{color:var(--muted);font-size:.85rem}
       </div>
 
       <figure class="hero-img">
-        <img src="https://www.getmira.co.in/assets/pics/morning.png" width="900" height="560" alt="Mira AI smart mirror showing the morning routine dashboard with time, weather and calendar" fetchpriority="high">
+        <img src="/assets/pics/morning.png" width="900" height="560" alt="Mira AI smart mirror showing the morning routine dashboard with time, weather and calendar" fetchpriority="high">
       </figure>
     </div>
   </section>
@@ -288,7 +294,7 @@ footer p{color:var(--muted);font-size:.85rem}
             <span>"Hey Mira, any messages?"</span>
           </div>
         </div>
-        <figure><img src="https://www.getmira.co.in/assets/pics/voice.png" width="560" height="420" loading="lazy" alt="Voice command interface responding to Hey Mira on the smart mirror"></figure>
+        <figure><img src="/assets/pics/voice.png" width="560" height="420" loading="lazy" alt="Voice command interface responding to Hey Mira on the smart mirror"></figure>
       </div>
 
       <div class="grid3">
@@ -303,7 +309,7 @@ footer p{color:var(--muted);font-size:.85rem}
   <section aria-labelledby="connected">
     <div class="wrap">
       <div class="row flip">
-        <figure><img src="https://www.getmira.co.in/assets/pics/whatsapp.png" width="560" height="420" loading="lazy" alt="WhatsApp notifications displayed on the Mira smart mirror"></figure>
+        <figure><img src="/assets/pics/whatsapp.png" width="560" height="420" loading="lazy" alt="WhatsApp notifications displayed on the Mira smart mirror"></figure>
         <div class="txt">
           <p class="eyebrow">Hands-free</p>
           <h3 id="connected">Stay connected</h3>
@@ -339,11 +345,11 @@ footer p{color:var(--muted);font-size:.85rem}
             <li>Works in dim light and complete darkness</li>
           </ul>
         </div>
-        <figure><img src="https://www.getmira.co.in/assets/cam/photo1.png" width="560" height="420" loading="lazy" alt="Mira smart mirror using face recognition to identify a user"></figure>
+        <figure><img src="/assets/cam/photo1.png" width="560" height="420" loading="lazy" alt="Mira smart mirror using face recognition to identify a user"></figure>
       </div>
 
       <div class="row flip">
-        <figure><img src="https://www.getmira.co.in/assets/cam/photo2.png" width="560" height="420" loading="lazy" alt="Motion detection alert captured by the Mira smart mirror camera"></figure>
+        <figure><img src="/assets/cam/photo2.png" width="560" height="420" loading="lazy" alt="Motion detection alert captured by the Mira smart mirror camera"></figure>
         <div class="txt">
           <p class="eyebrow">Motion detection</p>
           <h3>Instant alerts. Even at 3 AM.</h3>
@@ -367,7 +373,7 @@ footer p{color:var(--muted);font-size:.85rem}
             <li>No cloud subscription — fully private</li>
           </ul>
         </div>
-        <figure><img src="https://www.getmira.co.in/assets/cam/photo3.png" width="560" height="420" loading="lazy" alt="Live surveillance view streaming from the Mira smart mirror to a phone"></figure>
+        <figure><img src="/assets/cam/photo3.png" width="560" height="420" loading="lazy" alt="Live surveillance view streaming from the Mira smart mirror to a phone"></figure>
       </div>
     </div>
   </section>
@@ -382,7 +388,7 @@ footer p{color:var(--muted);font-size:.85rem}
       </div>
 
       <div class="row">
-        <figure><img src="https://www.getmira.co.in/assets/fitness/1.png" width="560" height="420" loading="lazy" alt="Mira smart mirror in active workout mode counting sets with red LED backlight"></figure>
+        <figure><img src="/assets/fitness/1.png" width="560" height="420" loading="lazy" alt="Mira smart mirror in active workout mode counting sets with red LED backlight"></figure>
         <div class="txt">
           <h3>Active set</h3>
           <p>Mira counts your sets, tracks calories in real time and coaches your form — completely hands-free. Push Ups, Set 2 of 3, LED red.</p>
@@ -403,8 +409,12 @@ footer p{color:var(--muted);font-size:.85rem}
   </section>
 
   <!-- ================= COMPANION + KARAOKE ================= -->
-  <section aria-labelledby="companion">
+  <section aria-labelledby="more-ways">
     <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Beyond the mirror</p>
+        <h2 id="more-ways">More ways to use Mira.</h2>
+      </div>
       <div class="row">
         <div class="txt">
           <p class="eyebrow">Companion app</p>
@@ -417,7 +427,7 @@ footer p{color:var(--muted);font-size:.85rem}
           <p>Transform your room into a visual stage. Mira syncs animated scrolling lyrics perfectly to your Spotify playlists, with dynamic RGB lighting and a sensitive built-in microphone for the ultimate at-home concert.</p>
         </div>
       </div>
-      <figure style="margin-top:48px"><img src="https://www.getmira.co.in/assets/karaoke-mode.png" width="1120" height="560" loading="lazy" alt="Mira smart mirror in karaoke mode with synced scrolling lyrics and RGB lighting"></figure>
+      <figure style="margin-top:48px"><img src="/assets/karaoke-mode.png" width="1120" height="560" loading="lazy" alt="Mira smart mirror in karaoke mode with synced scrolling lyrics and RGB lighting"></figure>
     </div>
   </section>
 
@@ -433,6 +443,37 @@ footer p{color:var(--muted);font-size:.85rem}
         <div class="step"><div class="num">02</div><h3>Scan &amp; connect</h3><p>Scan the QR on your phone. Enter your WiFi and link your accounts.</p></div>
         <div class="step"><div class="num">03</div><h3>Say Hey Mira</h3><p>Your mirror is live. Ask it anything, play music, or start your morning routine.</p></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= FAQ ================= -->
+  <section class="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Questions</p>
+        <h2 id="faq-title">Everything about the Mira smart mirror.</h2>
+      </div>
+
+      <details open>
+        <summary>What is Mira?</summary>
+        <p>Mira is an AI smart mirror — a voice-controlled mirror powered by Claude AI that shows your calendar, weather, WhatsApp messages and music, coaches your workouts, and recognises your face to load your personal dashboard automatically.</p>
+      </details>
+      <details>
+        <summary>How does the Mira smart mirror work?</summary>
+        <p>Say "Hey Mira" to wake it. The mirror listens with an always-on wake word, understands your request with on-device Claude AI, and responds in under two seconds — hands-free. It runs on a Raspberry Pi behind a two-way mirror and connects to your Google Calendar, Spotify and WhatsApp.</p>
+      </details>
+      <details>
+        <summary>Is the Mira smart mirror private and secure?</summary>
+        <p>Yes. Mira's camera has an indicator LED that lights up when active, can be disabled anytime from the companion app, and footage never leaves your device — there is no cloud subscription and no cloud storage.</p>
+      </details>
+      <details>
+        <summary>When will Mira ship and how much does it cost?</summary>
+        <p>The first batch is being built in Pune, India, and ships in 2026 in limited units. Join the waitlist for early access and founding-member pricing.</p>
+      </details>
+      <details>
+        <summary>What can I control with my voice on Mira?</summary>
+        <p>You can ask about your day, play or pause music, get the weather, check messages, start and control workouts, launch karaoke mode, and more — all completely hands-free.</p>
+      </details>
     </div>
   </section>
 

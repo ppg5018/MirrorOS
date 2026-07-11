@@ -10,7 +10,19 @@ Deploy-ready files for **getmira.co.in**, optimized to rank for the **Mira / AI 
 | `robots.txt` | site root | Allows all crawlers + AI bots, points to sitemap |
 | `sitemap.xml` | site root | Tells Google your one page + images |
 
-The page reuses your **existing images** at `getmira.co.in/assets/...`, so no image re-upload is needed.
+## ⚠️ Copy your images in before deploying
+
+The page now uses **portable relative image paths** (`/assets/...`) instead of hard-coded `getmira.co.in` URLs — better for SEO and for preview deploys. This means your images must ship **inside** the deploy. Empty `assets/`, `assets/pics/`, `assets/cam/`, `assets/fitness/` folders are already scaffolded in `landing/` — just drop your existing PNGs into them so the final structure is:
+
+```
+landing/assets/main.png
+landing/assets/karaoke-mode.png
+landing/assets/pics/morning.png, voice.png, whatsapp.png
+landing/assets/cam/photo1.png, photo2.png, photo3.png
+landing/assets/fitness/1.png
+```
+
+(The social-share and structured-data image URLs remain absolute `https://www.getmira.co.in/...` on purpose — that's what Facebook/Twitter/Google require.)
 
 ## Before you go live (2 quick edits)
 
