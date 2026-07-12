@@ -1,0 +1,78 @@
+/* ===== Mira blog — shared styles ===== */
+:root{
+  --bg:#000;
+  --accent:#4af0c4;
+  --text:#f4f4f4;
+  --muted:#9a9a9a;
+  --line:#1a1a1a;
+  --card:#0a0a0a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',system-ui,sans-serif;
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:'Space Mono',monospace;line-height:1.2;letter-spacing:-.02em}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding:0 24px}
+
+/* nav */
+header.nav{position:sticky;top:0;z-index:50;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1100px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:62px}
+.brand{font-family:'Space Mono',monospace;font-weight:700;letter-spacing:.24em;color:var(--text)}
+.btn{font-family:'Space Mono',monospace;font-size:.8rem;letter-spacing:.05em;padding:11px 20px;border:1px solid var(--accent);color:var(--accent);border-radius:2px;transition:background .2s,color .2s}
+.btn:hover{background:var(--accent);color:#000;text-decoration:none}
+.btn-solid{background:var(--accent);color:#000}
+
+/* article */
+article{padding:56px 0 40px}
+.eyebrow{font-family:'Space Mono',monospace;font-size:.72rem;letter-spacing:.26em;color:var(--accent);text-transform:uppercase}
+.crumbs{font-size:.8rem;color:var(--muted);margin-bottom:22px}
+.crumbs a{color:var(--muted)}
+article h1{font-size:clamp(2rem,5vw,3rem);margin:14px 0 18px}
+.meta{font-size:.82rem;color:var(--muted);margin-bottom:36px;font-family:'Space Mono',monospace}
+article h2{font-size:1.55rem;margin:44px 0 14px;color:#fff}
+article h3{font-size:1.2rem;margin:30px 0 10px}
+article p{margin:0 0 18px;color:#dcdcdc}
+article ul,article ol{margin:0 0 18px 22px;color:#dcdcdc}
+article li{margin:6px 0}
+article strong{color:#fff}
+.lead{font-size:1.2rem;color:#eaeaea !important}
+
+/* table */
+.tbl-scroll{overflow-x:auto;margin:24px 0}
+table{width:100%;border-collapse:collapse;font-size:.92rem;min-width:520px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{font-family:'Space Mono',monospace;font-size:.8rem;letter-spacing:.04em;color:var(--accent);border-bottom:1px solid #2a2a2a}
+tbody tr:hover{background:#080808}
+td.yes{color:var(--accent)}
+td.no{color:#666}
+
+/* callout + cta */
+.callout{border:1px solid var(--line);border-left:2px solid var(--accent);background:var(--card);padding:18px 22px;margin:26px 0;font-size:.95rem}
+.cta{border:1px solid var(--line);background:var(--card);padding:34px 28px;text-align:center;margin:48px 0 8px;border-radius:2px}
+.cta h3{font-size:1.4rem;margin-bottom:10px}
+.cta p{color:var(--muted);margin-bottom:20px}
+
+/* faq */
+.faq details{border:1px solid var(--line);padding:0 20px;margin-bottom:10px}
+.faq summary{font-family:'Space Mono',monospace;font-size:.98rem;padding:16px 0;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:14px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--accent)}
+.faq details[open] summary::after{content:"–"}
+.faq details[open] summary{color:var(--accent)}
+.faq p{padding:0 0 18px;color:#c4c4c4}
+
+/* related */
+.related{border-top:1px solid var(--line);padding:34px 0 10px;margin-top:40px}
+.related h4{font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+.related a{display:block;padding:8px 0}
+
+footer{border-top:1px solid var(--line);padding:40px 0;text-align:center;color:var(--muted);font-size:.82rem}
+footer .brand{display:block;margin-bottom:8px;color:var(--text)}
+.disclosure{font-size:.78rem;color:#777;font-style:italic;margin-top:30px;border-top:1px solid var(--line);padding-top:18px}
