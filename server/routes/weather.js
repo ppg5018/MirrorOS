@@ -3,17 +3,37 @@ const router = express.Router()
 const fetch = require('node-fetch')
 
 const MOCK = {
-  temp: 28,
-  condition: 'Partly Cloudy',
+  temp: 18,
+  feelsLike: 16,
+  high: 24,
+  low: 12,
+  weatherMain: 'Clear',
+  condition: 'Clear',
   city: 'Pune',
   humidity: 65,
-  icon: '⛅',
+  icon: '☀️',
+  // Hourly strip (matches the Mira design)
+  hourly: [
+    { label: '7a',  temp: 15, condition: 'Clear' },
+    { label: '9a',  temp: 19, condition: 'Clear' },
+    { label: '12p', temp: 23, condition: 'Clear' },
+    { label: '3p',  temp: 24, condition: 'Clouds' },
+    { label: '6p',  temp: 20, condition: 'Clouds' }
+  ],
   forecast: [
     { day: 'MON', temp: 31, condition: 'Clear', icon: '🌤' },
     { day: 'TUE', temp: 29, condition: 'Clouds', icon: '⛅' },
     { day: 'WED', temp: 33, condition: 'Clear', icon: '☀️' },
     { day: 'THU', temp: 27, condition: 'Rain', icon: '🌧' }
   ]
+}
+
+// Format an hour (0-23) as the compact label the design uses: "7a", "12p", "3p".
+function hourLabel(h) {
+  const period = h < 12 ? 'a' : 'p'
+  let h12 = h % 12
+  if (h12 === 0) h12 = 12
+  return h12 + period
 }
 
 let cache = { data: null, ts: 0 }
@@ -109,8 +129,32 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // Hourly strip — next 5 three-hourly readings, labelled like the design (9a, 12p…)
+    const hourly = forecastData.list.slice(0, 5).map(item => {
+      const date = new Date(item.dt * 1000)
+      return {
+        label: hourLabel(date.getHours()),
+        temp: Math.round(item.main.temp),
+        condition: item.weather[0]?.main
+      }
+    })
+
+    // Today's high / low — from the current reading plus every forecast slot
+    // that falls on today. Falls back to the current reading's own min/max.
+    const todayKey = new Date().toDateString()
+    let high = current.main.temp_max
+    let low  = current.main.temp_min
+    for (const item of forecastData.list) {
+      if (new Date(item.dt * 1000).toDateString() !== todayKey) continue
+      if (item.main.temp_max > high) high = item.main.temp_max
+      if (item.main.temp_min < low)  low  = item.main.temp_min
+    }
+
     const data = {
       temp: Math.round(current.main.temp),
+      feelsLike: Math.round(current.main.feels_like),
+      high: Math.round(high),
+      low: Math.round(low),
       weatherMain: current.weather[0]?.main,
       condition: current.weather[0]?.description
         ? current.weather[0].description.charAt(0).toUpperCase() + current.weather[0].description.slice(1)
@@ -118,6 +162,7 @@ router.get('/', async (req, res) => {
       city: current.name || city,
       humidity: current.main.humidity,
       icon: getIcon(current.weather[0]?.description),
+      hourly,
       forecast: forecast.slice(0, 4)
     }
 

@@ -1,19 +1,28 @@
 # MirrorOS — Python dependencies
 # Install: pip3 install -r requirements.txt
 
-# Wake word detection (Porcupine by Picovoice)
-pvporcupine>=3.0.0
+# Wake word detection (openWakeWord — open-source, no cloud, no AccessKey)
+openwakeword>=0.6.0
+onnxruntime>=1.10.0
+numpy>=1.24
+# On Raspberry Pi, tflite-runtime is lighter than onnxruntime (set WAKE_FRAMEWORK=tflite):
+#   pip3 install tflite-runtime
 
 # Audio I/O
 pyaudio>=0.2.13
 
-# Speech-to-text (Whisper Tiny ONLY — RAM constraint on Orange Pi)
+# Speech-to-text (Whisper — transcribe.py loads the 'base' model)
 openai-whisper>=20231117
+# Used by transcribe.py to boost quiet audio before STT
+soundfile>=0.12
 
 # HTTP requests (used by wakeword.py to call backend)
 requests>=2.31.0
 
-# Text-to-speech
+# Text-to-speech — Piper (neural, offline, natural) is primary.
+# Download a voice once:  python3 -m piper.download_voices en_US-amy-medium --download-dir server/voice/piper-voices
+piper-tts>=1.4.0
+# pyttsx3 (espeak) kept only as a fallback if Piper/voice is missing
 pyttsx3>=2.90
 
 

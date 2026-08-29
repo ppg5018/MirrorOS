@@ -1,7 +1,40 @@
 const fetch = require('node-fetch')
-const cron = require('node-cron')
+const reminders = require('../reminders')
 
 const BASE = `http://localhost:${process.env.PORT || 3000}`
+
+// ── Widget control ───────────────────────────────────────────
+// Canonical panel names the dashboard understands (see public/js/socket.js).
+const WIDGET_NAMES = [
+  'clock', 'weather', 'calendar', 'tasks', 'notifications',
+  'music', 'quote', 'news', 'wallpaper', 'ai-bar', 'habits', 'alarm'
+]
+// "all" targets content panels only (keep the clock and the AI bar visible).
+const ALL_WIDGETS = ['weather', 'calendar', 'tasks', 'notifications', 'music', 'quote', 'news', 'wallpaper']
+// Spoken synonyms → canonical name.
+const WIDGET_ALIASES = {
+  messages: 'notifications', message: 'notifications', notification: 'notifications',
+  whatsapp: 'notifications', email: 'notifications', gmail: 'notifications', notifs: 'notifications',
+  schedule: 'calendar', agenda: 'calendar', events: 'calendar', event: 'calendar', meetings: 'calendar',
+  todo: 'tasks', todos: 'tasks', task: 'tasks', 'to-do': 'tasks', 'to do': 'tasks',
+  song: 'music', songs: 'music', spotify: 'music', 'now playing': 'music', track: 'music',
+  headlines: 'news', 'news ticker': 'news',
+  temperature: 'weather', forecast: 'weather',
+  photos: 'wallpaper', photo: 'wallpaper', slideshow: 'wallpaper', 'ambient art': 'wallpaper',
+  art: 'wallpaper', picture: 'wallpaper', pictures: 'wallpaper',
+  time: 'clock',
+  'ai': 'ai-bar', 'ai bar': 'ai-bar', assistant: 'ai-bar',
+  alarms: 'alarm', 'alarm clock': 'alarm', habit: 'habits', streaks: 'habits'
+}
+function normalizeWidget(name) {
+  const n = String(name || '').trim().toLowerCase()
+  if (n === 'all' || n === 'everything') return 'all'
+  if (WIDGET_NAMES.includes(n)) return n
+  return WIDGET_ALIASES[n] || null
+}
+
+// Tracks the last volume we set so "louder"/"quieter" can step relative to it.
+let lastVolume = 50
 
 async function get(path) {
   const res = await fetch(`${BASE}${path}`)
@@ -89,6 +122,80 @@ const functions = {
     return res.json()
   },
 
+  manage_habits: async (input, _io) => {
+    const action = input.action
+
+    if (action === 'list' || action === 'status') {
+      const data = await get('/api/habits')
+      const list = data.habits || []
+      if (!list.length) return { success: true, habits: [], message: "You don't have any habits yet. Just say \"add a habit\" to start one." }
+      return {
+        success: true,
+        doneToday: data.doneToday,
+        total: data.total,
+        habits: list.map(h => ({ name: h.name, doneToday: h.doneToday, streak: h.streak }))
+      }
+    }
+
+    if (action === 'add') {
+      if (!input.name) return { success: false, message: 'What habit would you like to add?' }
+      const body = { name: input.name }
+      if (input.emoji)  body.emoji  = input.emoji
+      if (input.target) body.target = input.target
+      const res = await fetch(`${BASE}/api/habits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (res.status === 409) return { success: false, message: `You already have a "${input.name}" habit.` }
+      if (!res.ok) throw new Error(`POST /api/habits returned ${res.status}`)
+      const data = await res.json()
+      return { success: true, message: `Added "${data.habit.name}" to your habits. I'll help you keep the streak going.` }
+    }
+
+    // check / uncheck / remove all target an existing habit by name
+    if (!input.name) return { success: false, message: 'Which habit?' }
+
+    if (action === 'check') {
+      const res = await fetch(`${BASE}/api/habits/check`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: input.name })
+      })
+      if (res.status === 404) return { success: false, message: `I couldn't find a habit called "${input.name}".` }
+      if (!res.ok) throw new Error(`PATCH /api/habits/check returned ${res.status}`)
+      const d = await res.json()
+      const streakMsg = d.streak > 1 ? ` That's a ${d.streak}-day streak!` : ''
+      return { success: true, message: `Nice — marked "${d.name}" done for today.${streakMsg}` }
+    }
+
+    if (action === 'uncheck') {
+      const res = await fetch(`${BASE}/api/habits/uncheck`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: input.name })
+      })
+      if (res.status === 404) return { success: false, message: `I couldn't find a habit called "${input.name}".` }
+      if (!res.ok) throw new Error(`PATCH /api/habits/uncheck returned ${res.status}`)
+      const d = await res.json()
+      return { success: true, message: `Okay, unmarked "${d.name}" for today.` }
+    }
+
+    if (action === 'remove') {
+      const res = await fetch(`${BASE}/api/habits`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: input.name })
+      })
+      if (res.status === 404) return { success: false, message: `I couldn't find a habit called "${input.name}".` }
+      if (!res.ok) throw new Error(`DELETE /api/habits returned ${res.status}`)
+      const d = await res.json()
+      return { success: true, message: `Removed the "${d.deleted}" habit.` }
+    }
+
+    return { success: false, message: 'Unknown habit action: ' + action }
+  },
+
   set_backlight: async (input, _io) => {
     return post('/api/backlight', {
       mode: input.mode,
@@ -108,8 +215,16 @@ const functions = {
 
     if (action === 'volume') {
       const v = Math.min(100, Math.max(0, parseInt(volume) || 50))
+      lastVolume = v
       await post('/api/spotify/control', { action: 'volume', value: v })
       return { success: true, message: 'Volume set to ' + v + '%.' }
+    }
+
+    if (action === 'volume_up' || action === 'volume_down') {
+      const step = action === 'volume_up' ? 10 : -10
+      lastVolume = Math.min(100, Math.max(0, lastVolume + step))
+      await post('/api/spotify/control', { action: 'volume', value: lastVolume })
+      return { success: true, message: (step > 0 ? 'Turning it up to ' : 'Turning it down to ') + lastVolume + '%.' }
     }
 
     if (action === 'shuffle') {
@@ -165,23 +280,107 @@ const functions = {
     const results = await get('/api/spotify/search?q=' + encodeURIComponent(query))
     if (!results.length) return { success: false, message: 'Could not find "' + query + '" on Spotify.' }
     const top = results[0]
-    if (io) io.emit('spotify-play', { uri: top.uri })
-    return { success: true, message: 'Playing ' + top.title + ' by ' + top.artist + ' on Spotify.' }
+    // Start playback server-side (targets the Mira Connect device, else whatever
+    // device is active). Works headless — no browser/SDK needed.
+    try {
+      await post('/api/spotify/play', { uri: top.uri })
+      if (io) io.emit('spotify-play', { uri: top.uri })  // refresh any open dashboard
+      return { success: true, message: 'Playing ' + top.title + ' by ' + top.artist + ' on Spotify.' }
+    } catch (e) {
+      return {
+        success: false,
+        message: 'Found ' + top.title + ', but no Spotify speaker is active. Open Spotify on a device (or start Mira) and try again.'
+      }
+    }
   },
 
-  set_reminder: async (input, io) => {
-    const [hours, minutes] = input.time.split(':')
-    if (!hours || !minutes) {
-      return { error: 'Invalid time format. Use HH:MM' }
+  set_reminder: async (input, _io) => {
+    // Fires exactly once at the next occurrence of input.time and persists
+    // across restarts — see server/reminders.js.
+    const result = reminders.addReminder(input.message, input.time)
+    if (result.error) return result
+    return { success: true, message: `Reminder set for ${input.time}: "${input.message}"` }
+  },
+
+  alarm_control: async (input, _io) => {
+    const action = input.action
+
+    if (action === 'list') {
+      const data = await get('/api/alarm')
+      const list = data.alarms || []
+      if (!list.length) return { success: true, alarms: [], message: "You don't have any alarms set." }
+      return {
+        success: true,
+        count:   list.length,
+        alarms:  list.map(a => ({ time: a.time, label: a.label, repeat: a.repeat, enabled: a.enabled })),
+        next:    data.next ? { time: data.next.time, label: data.next.label } : null
+      }
     }
 
-    const cronExpr = `${parseInt(minutes)} ${parseInt(hours)} * * *`
-    cron.schedule(cronExpr, () => {
-      console.log(`[reminder] firing: ${input.message}`)
-      if (io) io.emit('ai-response', { text: `Reminder: ${input.message}`, isReminder: true })
-    }, { scheduled: true, timezone: 'Asia/Kolkata' })
+    if (action === 'set') {
+      if (!input.time) return { success: false, message: 'What time should I set the alarm for?' }
+      const res = await fetch(`${BASE}/api/alarm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          time:   input.time,
+          label:  input.label || '',
+          repeat: input.repeat || 'once'
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { success: false, message: err.error || 'Could not set that alarm.' }
+      }
+      const data = await res.json()
+      const a = data.alarm
+      const rep = a.repeat && a.repeat !== 'once' ? ` (${a.repeat})` : ''
+      const lbl = a.label ? ` for "${a.label}"` : ''
+      return { success: true, message: `Alarm set for ${a.time}${rep}${lbl}.` }
+    }
 
-    return { success: true, message: `Reminder set for ${input.time}: "${input.message}"` }
+    if (action === 'snooze') {
+      const data = await post('/api/alarm/snooze', { minutes: input.minutes })
+      return data
+    }
+
+    if (action === 'stop') {
+      const data = await post('/api/alarm/stop', {})
+      return data
+    }
+
+    if (action === 'delete') {
+      const res = await fetch(`${BASE}/api/alarm`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: input.query || 'all' })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { success: false, message: err.error || 'No matching alarm found.' }
+      }
+      const data = await res.json()
+      const n = (data.deleted || []).length
+      return { success: true, message: n > 1 ? `Deleted ${n} alarms.` : `Deleted the ${(data.deleted[0] || {}).time || ''} alarm.` }
+    }
+
+    if (action === 'enable' || action === 'disable') {
+      const res = await fetch(`${BASE}/api/alarm`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: input.query || 'all', enabled: action === 'enable' })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { success: false, message: err.error || 'No matching alarm found.' }
+      }
+      const data = await res.json()
+      const n = (data.updated || []).length
+      const verb = action === 'enable' ? 'Turned on' : 'Turned off'
+      return { success: true, message: n > 1 ? `${verb} ${n} alarms.` : `${verb} the ${(data.updated[0] || {}).time || ''} alarm.` }
+    }
+
+    return { success: false, message: 'Unknown alarm action: ' + action }
   },
 
   get_news: async (_input) => {
@@ -194,78 +393,6 @@ const functions = {
         'RBI holds repo rate steady at 6.5%'
       ]
     }
-  },
-
-  play_youtube: async (input, io) => {
-    if (input.action === 'close') {
-      if (io) io.emit('youtube-close')
-      return { success: true, message: 'Closing the video.' }
-    }
-
-    if (input.action === 'play_from_history') {
-      const histData = await get('/api/youtube/history')
-      const history  = histData.results || []
-
-      if (history.length === 0) {
-        return { success: false, message: 'No watch history found. History may be paused in Google settings.' }
-      }
-
-      // Match keyword in title if provided, else pick most recent
-      let match = history[0]
-      if (input.query) {
-        const q = input.query.toLowerCase()
-        match = history.find(v => v.title.toLowerCase().includes(q)) || history[0]
-      }
-
-      if (io) io.emit('youtube-play', { videoId: match.videoId, title: match.title, channel: match.channel })
-      return { success: true, message: `Playing "${match.title}" from your watch history.` }
-    }
-
-    if (input.action === 'play_from_subscriptions') {
-      const subData = await get('/api/youtube/subscriptions')
-      const subs    = subData.subscriptions || []
-
-      if (subs.length === 0) {
-        return { success: false, message: 'No subscriptions found on your YouTube account.' }
-      }
-
-      const q = (input.query || '').toLowerCase()
-      const channel = subs.find(s => s.channelName.toLowerCase().includes(q))
-      if (!channel) {
-        return { success: false, message: `Could not find a subscription matching "${input.query}".` }
-      }
-
-      // Search for latest video from that channel
-      const searchData = await get('/api/youtube/search?q=' + encodeURIComponent(channel.channelName + ' latest'))
-      const results    = searchData.results || []
-
-      if (results.length === 0) {
-        return { success: false, message: `No videos found for ${channel.channelName}.` }
-      }
-
-      const top = results[0]
-      if (io) io.emit('youtube-play', { videoId: top.videoId, title: top.title, channel: top.channel })
-      return { success: true, message: `Playing the latest from ${channel.channelName} on YouTube.` }
-    }
-
-    // Default: search_and_play
-    if (!input.query) return { error: 'query is required for search_and_play' }
-
-    const data    = await get('/api/youtube/search?q=' + encodeURIComponent(input.query))
-    const results = data.results || []
-
-    if (results.length === 0) {
-      return { success: false, message: `No YouTube videos found for: ${input.query}` }
-    }
-
-    // If not authenticated, results come back as mock — don't try to play, just inform
-    if (data.source === 'mock') {
-      return { success: false, message: 'YouTube is not connected yet. Run node scripts/google-auth.js to sign in with Google.' }
-    }
-
-    const top = results[0]
-    if (io) io.emit('youtube-play', { videoId: top.videoId, title: top.title, channel: top.channel })
-    return { success: true, message: `Playing "${top.title}" by ${top.channel} on YouTube.` }
   },
 
   control_slideshow: async (input, io) => {
@@ -308,6 +435,48 @@ const functions = {
   screensaver_control: async (input, io) => {
     if (io) io.emit('screensaver:' + input.action)
     return { success: true, message: input.action === 'enter' ? 'Screensaver started.' : 'Screensaver stopped.' }
+  },
+
+  control_widget: async (input, io) => {
+    const action = input.action
+    const target = normalizeWidget(input.widget)
+    if (!target) {
+      return { success: false, message: `I don't have a panel called "${input.widget}".` }
+    }
+
+    const widgets = target === 'all' ? ALL_WIDGETS : [target]
+    const label = target === 'all' ? 'everything' : target.replace('-', ' ')
+
+    if (action === 'highlight') {
+      if (io) widgets.forEach(w => io.emit('widget-highlight', { widget: w }))
+      return { success: true, message: `Highlighting ${label}.` }
+    }
+
+    const visible = action === 'show'
+    if (io) widgets.forEach(w => io.emit('widget-toggle', { widget: w, visible }))
+    return { success: true, message: `${visible ? 'Showing' : 'Hiding'} ${label}.` }
+  },
+
+  control_display: async (input, io) => {
+    const action = input.action
+
+    if (action === 'clear_wallpaper') {
+      if (io) io.emit('wallpaper-control', { action: 'clear' })
+      return { success: true, message: 'Cleared the ambient art.' }
+    }
+
+    // Brightness — the dashboard keeps the actual level and applies a dim overlay.
+    if (action === 'set_brightness') {
+      const level = Math.min(100, Math.max(10, parseInt(input.value, 10) || 100))
+      if (io) io.emit('display-brightness', { action: 'set', level })
+      return { success: true, message: `Screen brightness set to ${level}%.` }
+    }
+    if (action === 'dim' || action === 'brighten') {
+      if (io) io.emit('display-brightness', { action })
+      return { success: true, message: action === 'dim' ? 'Dimming the screen.' : 'Brightening the screen.' }
+    }
+
+    return { success: false, message: 'Unknown display action.' }
   },
 
   karaoke_control: async (input, io) => {

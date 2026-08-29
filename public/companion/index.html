@@ -574,19 +574,7 @@
                                     onclick="this.classList.toggle('active')">✅ My Tasks</button> <button
                                     class="pill-btn" onclick="this.classList.toggle('active')">🌙 Goodnight</button>
                             </div>
-                        </div><!-- YouTube -->
-                        <div class="section-card fade-in-d3">
-                            <div class="label-caps" style="margin-bottom:10px;">
-                                YouTube
-                            </div>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <input type="text" placeholder="Search YouTube to play on mirror..."
-                                    style="flex:1; background:#111; border:1px solid #1A1A1A; border-radius:999px; padding:10px 16px; color:#fff; font-size:13px; outline:none; font-family:'DM Sans',sans-serif;">
-                                <button
-                                    style="width:36px; height:36px; border-radius:50%; background:#F04A4A; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                    <i data-lucide="play" style="width:16px; height:16px; color:#fff;"></i> </button>
-                            </div>
-                        </div>
+                        </div><!-- Quick Commands -->
                     </div><!-- Controls Tab -->
                     <div class="tab-content" data-tab="controls" data-device="mobile">
                         <!-- Backlight -->
@@ -1275,6 +1263,42 @@
                             <div id="m-no-wallpapers" style="display:none; font-size:12px; color:#555; padding:8px 0;">No wallpapers yet. Upload one above!</div>
                         </div>
                     </div>
+                    <div class="tab-content" data-tab="planner" data-device="mobile">
+                        <div class="section-card fade-in">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <div class="label-caps">Today</div>
+                                <span id="m-cal-date" style="font-size:11px; color:#555;"></span>
+                            </div>
+                            <div id="m-cal-list"><div style="font-size:12px; color:#555;">Loading…</div></div>
+                        </div>
+                        <div class="section-card fade-in-d1">
+                            <div class="label-caps" style="margin-bottom:12px;">Tasks</div>
+                            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                                <input id="m-task-input" type="text" placeholder="Add a task…" maxlength="80" onkeydown="if(event.key==='Enter')addTask('m')"
+                                    style="flex:1; background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:10px; font-size:13px;">
+                                <button onclick="addTask('m')" style="background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:0 16px; font-size:18px; font-weight:600; cursor:pointer;">+</button>
+                            </div>
+                            <div id="m-task-list"><div style="font-size:12px; color:#555;">Loading…</div></div>
+                        </div>
+                        <div class="section-card fade-in-d2">
+                            <div class="label-caps" style="margin-bottom:12px;">Alarms</div>
+                            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                                <input id="m-alarm-time" type="time"
+                                    style="background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:9px; font-size:13px;">
+                                <input id="m-alarm-label" type="text" placeholder="Label" maxlength="40"
+                                    style="flex:1; min-width:90px; background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:9px; font-size:13px;">
+                                <select id="m-alarm-repeat"
+                                    style="background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:9px; font-size:13px;">
+                                    <option value="once">Once</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekdays">Weekdays</option>
+                                    <option value="weekends">Weekends</option>
+                                </select>
+                                <button onclick="addAlarm('m')" style="background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:0 16px; font-size:13px; font-weight:600; cursor:pointer;">Add</button>
+                            </div>
+                            <div id="m-alarm-list"><div style="font-size:12px; color:#555;">Loading…</div></div>
+                        </div>
+                    </div>
                 </div><!-- Toast -->
                 <div id="m-toast" class="toast-msg"></div><!-- Bottom Nav -->
                 <div
@@ -1288,6 +1312,11 @@
                         style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; padding:6px 0; border-top:2px solid transparent; color:#444;">
                         <i data-lucide="sliders" style="width:20px; height:20px;"></i> <span
                             style="font-size:10px;">Controls</span>
+                    </div>
+                    <div class="tab-btn" data-tab="planner" data-device="mobile" onclick="switchTab(this)"
+                        style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; padding:6px 0; border-top:2px solid transparent; color:#444;">
+                        <i data-lucide="calendar-check" style="width:20px; height:20px;"></i> <span
+                            style="font-size:10px;">Planner</span>
                     </div>
                     <div class="tab-btn" data-tab="status" data-device="mobile" onclick="switchTab(this)"
                         style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; padding:6px 0; border-top:2px solid transparent; color:#444;">
@@ -1329,6 +1358,10 @@
                         <div class="desktop-nav-item" data-tab="controls" data-device="desktop"
                             onclick="switchDesktopTab(this)">
                             <i data-lucide="sliders" style="width:18px; height:18px;"></i> <span>Controls</span>
+                        </div>
+                        <div class="desktop-nav-item" data-tab="planner" data-device="desktop"
+                            onclick="switchDesktopTab(this)">
+                            <i data-lucide="calendar-check" style="width:18px; height:18px;"></i> <span>Planner</span>
                         </div>
                         <div class="desktop-nav-item" data-tab="status" data-device="desktop"
                             onclick="switchDesktopTab(this)">
@@ -1394,20 +1427,7 @@
                                             Tasks</button> <button class="pill-btn"
                                             onclick="this.classList.toggle('active')">🌙 Goodnight</button>
                                     </div>
-                                </div><!-- YouTube -->
-                                <div class="section-card fade-in-d2">
-                                    <div class="label-caps" style="margin-bottom:10px;">
-                                        YouTube
-                                    </div>
-                                    <div style="display:flex; gap:8px; align-items:center;">
-                                        <input type="text" placeholder="Search YouTube to play on mirror..."
-                                            style="flex:1; background:#111; border:1px solid #1A1A1A; border-radius:999px; padding:10px 16px; color:#fff; font-size:13px; outline:none; font-family:'DM Sans',sans-serif;">
-                                        <button
-                                            style="width:36px; height:36px; border-radius:50%; background:#F04A4A; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                            <i data-lucide="play" style="width:16px; height:16px; color:#fff;"></i>
-                                        </button>
-                                    </div>
-                                </div>
+                                </div><!-- Quick Commands -->
                             </div>
                             <div>
                                 <!-- Memory -->
@@ -2281,6 +2301,44 @@
                             </div>
                         </div>
                     </div>
+                    <div class="tab-content" data-tab="planner" data-device="desktop">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                            <div class="section-card fade-in">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <div class="label-caps">Today</div>
+                                    <span id="d-cal-date" style="font-size:12px; color:#555;"></span>
+                                </div>
+                                <div id="d-cal-list"><div style="font-size:13px; color:#555;">Loading…</div></div>
+                            </div>
+                            <div class="section-card fade-in-d1">
+                                <div class="label-caps" style="margin-bottom:14px;">Tasks</div>
+                                <div style="display:flex; gap:10px; margin-bottom:14px;">
+                                    <input id="d-task-input" type="text" placeholder="Add a task…" maxlength="80" onkeydown="if(event.key==='Enter')addTask('d')"
+                                        style="flex:1; background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:11px; font-size:14px;">
+                                    <button onclick="addTask('d')" style="background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:0 18px; font-size:20px; font-weight:600; cursor:pointer;">+</button>
+                                </div>
+                                <div id="d-task-list"><div style="font-size:13px; color:#555;">Loading…</div></div>
+                            </div>
+                            <div class="section-card fade-in-d2" style="grid-column:1 / -1;">
+                                <div class="label-caps" style="margin-bottom:14px;">Alarms</div>
+                                <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                                    <input id="d-alarm-time" type="time"
+                                        style="background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:10px; font-size:14px;">
+                                    <input id="d-alarm-label" type="text" placeholder="Label (optional)" maxlength="40"
+                                        style="flex:1; min-width:140px; background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:10px; font-size:14px;">
+                                    <select id="d-alarm-repeat"
+                                        style="background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#fff; padding:10px; font-size:14px;">
+                                        <option value="once">Once</option>
+                                        <option value="daily">Daily</option>
+                                        <option value="weekdays">Weekdays</option>
+                                        <option value="weekends">Weekends</option>
+                                    </select>
+                                    <button onclick="addAlarm('d')" style="background:#4AF0C4; color:#000; border:none; border-radius:8px; padding:0 20px; font-size:14px; font-weight:600; cursor:pointer;">Add</button>
+                                </div>
+                                <div id="d-alarm-list"><div style="font-size:13px; color:#555;">Loading…</div></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2357,20 +2415,8 @@
             lucide.createIcons();
         }
 
-        // AI query
-        function sendAIQuery(device) {
-            const input = document.getElementById(device === 'mobile' ? 'm-ai-input' : 'd-ai-input');
-            const response = document.getElementById(device === 'mobile' ? 'm-ai-response' : 'd-ai-response');
-            if (!input.value.trim()) return;
-            response.textContent = 'Thinking...';
-            response.style.color = '#4AF0C4';
-            const query = input.value;
-            input.value = '';
-            setTimeout(() => {
-                response.style.color = '#888';
-                response.textContent = `I've processed your request: "${query}". The mirror display has been updated accordingly.`;
-            }, 1200);
-        }
+        // AI query — real implementation lives in the socket script block below
+        // (window.sendAIQuery). No mock here; it would only shadow the real one.
 
         // Clear memory
         function showClearConfirm(device) {
@@ -2501,15 +2547,18 @@
     response.textContent = 'Thinking...';
     response.style.color = '#4AF0C4';
     try {
-      await fetch('/api/voice', {
+      // Read the reply straight from this request's response body. The mirror
+      // also broadcasts an `ai-response` socket event to every client, but
+      // racing on that (socket.once) can pick up a reply meant for a different
+      // device. The POST body is scoped to this exact request, so use it.
+      const res = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: query })
       });
-      socket.once('ai-response', data => {
-        response.style.color = '#888';
-        response.textContent = data.text || data.response || '';
-      });
+      const data = await res.json().catch(() => ({}));
+      response.style.color = '#888';
+      response.textContent = data.reply || data.text || 'No response';
     } catch(e) {
       response.style.color = '#F04A4A';
       response.textContent = 'Connection error';
@@ -2652,40 +2701,6 @@
   // Load on init
   loadPhotoGrid();
 
-  // ─── YouTube Search ──────────────────────────────────────────
-  document.querySelectorAll('.section-card').forEach(card => {
-    const label = card.querySelector('.label-caps');
-    if (!label || label.textContent.trim() !== 'YouTube') return;
-    const input = card.querySelector('input[type=text]');
-    const btn = card.querySelector('button');
-    if (!input || !btn) return;
-    const playYT = async () => {
-      const q = input.value.trim();
-      if (!q) return;
-      const origIcon = btn.innerHTML;
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/></svg>';
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/youtube/play', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: q })
-        });
-        const data = await res.json();
-        if (data.success) {
-          input.value = '';
-          btn.style.background = '#5EE8C4';
-          setTimeout(() => { btn.style.background = '#F04A4A'; }, 1500);
-        }
-      } catch(e) { /* silent */ }
-      btn.innerHTML = origIcon;
-      btn.disabled = false;
-      lucide.createIcons();
-    };
-    btn.addEventListener('click', playYT);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') playYT(); });
-  });
-
   // ─── Announce ────────────────────────────────────────────────
   document.querySelectorAll('button').forEach(btn => {
     if (btn.textContent.trim() === 'Send to Mirror') {
@@ -2771,6 +2786,222 @@
     } catch(e) { /* silent */ }
   }
 
+  // ─── Planner: Calendar + Tasks + Alarms ──────────────────────
+  const PLANNER_PREFIXES = ['m', 'd'];
+  const plannerCache = { m: { tasks: [], alarms: [] }, d: { tasks: [], alarms: [] } };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function plannerToast(msg, ok) {
+    const t = document.getElementById('m-toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.color = ok === false ? '#F04A4A' : '#4AF0C4';
+    t.classList.add('visible');
+    clearTimeout(t._plTimer);
+    t._plTimer = setTimeout(() => t.classList.remove('visible'), 2200);
+  }
+
+  window.loadPlanner = function(prefix) {
+    loadCalendar(prefix);
+    loadTasks(prefix);
+    loadAlarms(prefix);
+  };
+
+  // Calendar
+  async function loadCalendar(prefix) {
+    const el = document.getElementById(prefix + '-cal-list');
+    const dateEl = document.getElementById(prefix + '-cal-date');
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!el) return;
+    try {
+      const data = await fetch('/api/calendar').then(r => r.json());
+      const events = data.events || [];
+      if (!events.length) {
+        el.innerHTML = '<div style="font-size:12px; color:#555; padding:6px 0;">Nothing scheduled today.</div>';
+        return;
+      }
+      el.innerHTML = events.map(ev => `
+        <div style="display:flex; gap:12px; align-items:baseline; padding:8px 0; border-bottom:1px solid #1A1A1A;">
+          <span style="font-family:'Space Mono',monospace; font-size:13px; color:${ev.current ? '#4AF0C4' : '#888'}; min-width:46px;">${esc(ev.time)}</span>
+          <div style="flex:1;">
+            <div style="font-size:13px; color:${ev.current ? '#fff' : '#ccc'};">${esc(ev.title)}</div>
+            ${ev.location ? `<div style="font-size:11px; color:#555;">${esc(ev.location)}</div>` : ''}
+          </div>
+        </div>`).join('');
+    } catch (e) {
+      el.innerHTML = '<div style="font-size:12px; color:#F04A4A;">Couldn’t load calendar.</div>';
+    }
+  }
+
+  // Tasks
+  async function loadTasks(prefix) {
+    const el = document.getElementById(prefix + '-task-list');
+    if (!el) return;
+    try {
+      const data = await fetch('/api/tasks').then(r => r.json());
+      renderTasks(prefix, data.tasks || []);
+    } catch (e) {
+      el.innerHTML = '<div style="font-size:12px; color:#F04A4A;">Couldn’t load tasks.</div>';
+    }
+  }
+
+  function renderTasks(prefix, tasks) {
+    plannerCache[prefix].tasks = tasks;
+    const el = document.getElementById(prefix + '-task-list');
+    if (!el) return;
+    if (!tasks.length) {
+      el.innerHTML = '<div style="font-size:12px; color:#555; padding:6px 0;">No tasks yet.</div>';
+      return;
+    }
+    el.innerHTML = tasks.map((t, i) => {
+      const dot = t.priority === 'high' ? '#F04A4A' : t.priority === 'medium' ? '#F0B84A' : '#4AF0C4';
+      return `
+        <div style="display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #1A1A1A;">
+          <span onclick="completeTaskIdx('${prefix}', ${i})"
+            style="width:16px; height:16px; border-radius:50%; border:2px solid ${t.done ? '#4AF0C4' : dot}; background:${t.done ? '#4AF0C4' : 'transparent'}; cursor:pointer; flex-shrink:0;"></span>
+          <span style="flex:1; font-size:13px; color:${t.done ? '#555' : '#ddd'}; text-decoration:${t.done ? 'line-through' : 'none'};">${esc(t.text)}</span>
+          <span onclick="deleteTaskIdx('${prefix}', ${i})" style="color:#555; font-size:18px; line-height:1; cursor:pointer; padding:0 4px;">&times;</span>
+        </div>`;
+    }).join('');
+  }
+
+  window.addTask = async function(prefix) {
+    const input = document.getElementById(prefix + '-task-input');
+    if (!input || !input.value.trim()) return;
+    const task = input.value.trim();
+    input.value = '';
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task, priority: 'normal' })
+      });
+      if (!res.ok) throw new Error();
+      plannerToast('Task added');
+      PLANNER_PREFIXES.forEach(loadTasks);
+    } catch (e) {
+      plannerToast('Couldn’t add task', false);
+    }
+  };
+
+  window.completeTaskIdx = async function(prefix, i) {
+    const t = plannerCache[prefix].tasks[i];
+    if (!t || t.done) return;
+    try {
+      await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t.text })
+      });
+      plannerToast('Task done');
+      PLANNER_PREFIXES.forEach(loadTasks);
+    } catch (e) { plannerToast('Update failed', false); }
+  };
+
+  window.deleteTaskIdx = async function(prefix, i) {
+    const t = plannerCache[prefix].tasks[i];
+    if (!t) return;
+    try {
+      await fetch('/api/tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t.text })
+      });
+      plannerToast('Task removed');
+      PLANNER_PREFIXES.forEach(loadTasks);
+    } catch (e) { plannerToast('Delete failed', false); }
+  };
+
+  // Alarms
+  async function loadAlarms(prefix) {
+    const el = document.getElementById(prefix + '-alarm-list');
+    if (!el) return;
+    try {
+      const data = await fetch('/api/alarm').then(r => r.json());
+      renderAlarms(prefix, data.alarms || []);
+    } catch (e) {
+      el.innerHTML = '<div style="font-size:12px; color:#F04A4A;">Couldn’t load alarms.</div>';
+    }
+  }
+
+  function renderAlarms(prefix, list) {
+    plannerCache[prefix].alarms = list;
+    const el = document.getElementById(prefix + '-alarm-list');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div style="font-size:12px; color:#555; padding:6px 0;">No alarms set.</div>';
+      return;
+    }
+    el.innerHTML = list.map((a, i) => `
+      <div style="display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #1A1A1A;">
+        <span style="font-family:'Space Mono',monospace; font-size:15px; color:${a.enabled ? '#fff' : '#555'}; min-width:56px;">${esc(a.time)}</span>
+        <div style="flex:1;">
+          ${a.label ? `<div style="font-size:12px; color:${a.enabled ? '#ccc' : '#555'};">${esc(a.label)}</div>` : ''}
+          <div style="font-size:10px; color:#555; text-transform:uppercase; letter-spacing:0.5px;">${esc(a.repeat || 'Once')}</div>
+        </div>
+        <span onclick="toggleAlarmIdx('${prefix}', ${i})"
+          style="width:34px; height:18px; border-radius:9px; background:${a.enabled ? '#4AF0C4' : '#333'}; position:relative; cursor:pointer; flex-shrink:0;">
+          <span style="position:absolute; top:2px; left:${a.enabled ? '18px' : '2px'}; width:14px; height:14px; border-radius:50%; background:#000; transition:left 0.15s;"></span>
+        </span>
+        <span onclick="deleteAlarmIdx('${prefix}', ${i})" style="color:#555; font-size:18px; line-height:1; cursor:pointer; padding:0 4px;">&times;</span>
+      </div>`).join('');
+  }
+
+  window.addAlarm = async function(prefix) {
+    const time = document.getElementById(prefix + '-alarm-time');
+    const label = document.getElementById(prefix + '-alarm-label');
+    const repeat = document.getElementById(prefix + '-alarm-repeat');
+    if (!time || !time.value) { plannerToast('Pick a time first', false); return; }
+    try {
+      const res = await fetch('/api/alarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ time: time.value, label: label ? label.value.trim() : '', repeat: repeat ? repeat.value : 'once' })
+      });
+      if (!res.ok) throw new Error();
+      if (label) label.value = '';
+      plannerToast('Alarm set');
+      PLANNER_PREFIXES.forEach(loadAlarms);
+    } catch (e) {
+      plannerToast('Couldn’t set alarm', false);
+    }
+  };
+
+  window.toggleAlarmIdx = async function(prefix, i) {
+    const a = plannerCache[prefix].alarms[i];
+    if (!a) return;
+    try {
+      await fetch('/api/alarm', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: a.time, enabled: !a.enabled })
+      });
+      PLANNER_PREFIXES.forEach(loadAlarms);
+    } catch (e) { plannerToast('Update failed', false); }
+  };
+
+  window.deleteAlarmIdx = async function(prefix, i) {
+    const a = plannerCache[prefix].alarms[i];
+    if (!a) return;
+    try {
+      await fetch('/api/alarm', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: a.time })
+      });
+      plannerToast('Alarm removed');
+      PLANNER_PREFIXES.forEach(loadAlarms);
+    } catch (e) { plannerToast('Delete failed', false); }
+  };
+
+  // Keep planner live when the mirror or another device changes things
+  socket.on('tasks-updated', d => { PLANNER_PREFIXES.forEach(p => renderTasks(p, d.tasks || [])); });
+  socket.on('alarms-updated', d => { PLANNER_PREFIXES.forEach(p => renderAlarms(p, (d && d.alarms) || [])); });
+
   const _origSwitchTab = window.switchTab;
   window.switchTab = function(el) {
     if (_origSwitchTab) _origSwitchTab(el);
@@ -2778,6 +3009,7 @@
     if (tab === 'status') refreshStatus();
     if (tab === 'fitness') refreshFitnessHistory();
     if (tab === 'controls') loadPhotoGrid();
+    if (tab === 'planner') loadPlanner('m');
   };
 
   const _origSwitchDesktopTab = window.switchDesktopTab;
@@ -2787,6 +3019,7 @@
     if (tab === 'status') refreshStatus();
     if (tab === 'fitness') refreshFitnessHistory();
     if (tab === 'controls') loadPhotoGrid();
+    if (tab === 'planner') loadPlanner('d');
   };
 
   // ─── Spotify Now Playing ─────────────────────────────────────

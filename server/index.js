@@ -16,6 +16,15 @@ if (!process.env.CLAUDE_API_KEY) {
   process.exit(1)
 }
 
+// Global safety net — a stray throw in a timer/callback or an unhandled
+// promise rejection must never take the whole mirror down.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException:', err && (err.stack || err.message) || err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection:', reason && (reason.stack || reason.message) || reason)
+})
+
 const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
@@ -23,11 +32,20 @@ const cors = require('cors')
 const compression = require('compression')
 const logger = require('./logger')
 
+const auth = require('./middleware/auth')
+
 const app = express()
 const server = http.createServer(app)
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: auth.corsOptions,
+  // perMessageDeflate buffers per-connection compression context (memory + CPU)
+  // for little benefit on a LAN — disable it on the Pi. Also cap payload size.
+  perMessageDeflate: false,
+  maxHttpBufferSize: 1e6
 })
+
+// Require the shared secret on every socket connection (loopback exempt).
+io.use(auth.socketAuth)
 
 // Make io accessible to routes
 app.set('io', io)
@@ -39,17 +57,21 @@ app.set('workoutEngine', workoutEngine)
 
 // Middleware
 app.use(compression())
-app.use(cors())
+app.use(cors(auth.corsOptions))
 app.use(express.json())
 app.use(logger.middleware)
+
+// Hand the shared secret to same-origin pages so browser requests
+// (dashboard, companion, karaoke) authenticate transparently.
+app.use(auth.issueKeyCookie)
 
 // Root route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'))
 })
 
-// Static files
-app.use(express.static(path.join(__dirname, '../public')))
+// Static files — cache so the kiosk stops re-fetching CSS/JS on every reload.
+app.use(express.static(path.join(__dirname, '../public'), { maxAge: '1h' }))
 
 // Companion app
 app.get('/companion', (req, res) => {
@@ -99,26 +121,27 @@ app.get('/reconnect', (req, res) => {
   .btn{display:block;width:100%;padding:16px;border:none;border-radius:12px;font-size:16px;
     font-weight:600;cursor:pointer;margin-bottom:14px;text-align:center}
   .btn-google{background:#fff;color:#000}
+  .btn-email{background:#4af0c4;color:#000}
   .btn-spotify{background:#1DB954;color:#000}
   .msg{font-size:13px;margin-top:16px;text-align:center;min-height:20px;color:#4af0c4}
 </style>
 </head>
 <body>
 <h1>Reconnect Services</h1>
-<p>Tap a service to re-authenticate it on the mirror.</p>
-<button class="btn btn-google" onclick="reconnect('google',this)">Reconnect Google (Gmail + Calendar)</button>
-<button class="btn btn-spotify" onclick="reconnect('spotify',this)">Reconnect Spotify</button>
+<p>Tap a service to set it up again on the mirror.</p>
+<button class="btn btn-google" onclick="reconnect()">Reconnect Calendar (Google sign-in)</button>
+<button class="btn btn-email" onclick="reconnect()">Reconnect Email (app password)</button>
+<button class="btn btn-spotify" onclick="reconnect()">Reconnect Spotify</button>
 <div class="msg" id="msg"></div>
 <script>
-async function reconnect(service, btn) {
-  if (service === 'google' || service === 'spotify') {
-    window.location.href = '/setup'
-  }
-}
+function reconnect() { window.location.href = '/setup' }
 </script>
 </body>
 </html>`)
 })
+
+// Shared-secret guard for the whole API surface (loopback exempt).
+app.use('/api', auth.apiKeyGuard)
 
 // Routes
 app.use('/api/weather',     require('./routes/weather'))
@@ -126,6 +149,8 @@ app.use('/api/calendar',    require('./routes/calendar'))
 app.use('/api/gmail',       require('./routes/gmail'))
 app.use('/api/whatsapp',    require('./routes/whatsapp'))
 app.use('/api/tasks',       require('./routes/tasks'))
+app.use('/api/habits',      require('./routes/habits'))
+app.use('/api/alarm',       require('./routes/alarm'))
 app.use('/api/backlight',   require('./routes/backlight'))
 app.use('/api/voice',       require('./routes/voice'))
 app.use('/api/status',      require('./routes/status'))
@@ -143,13 +168,13 @@ app.use('/api/screensaver', require('./routes/screensaver'))
 app.use('/api/setup',      require('./routes/setup'))
 
 // Serve uploaded photos as static files
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')))
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads'), { maxAge: '1d' }))
 
-// Serve fitness GIFs as static files
-app.use('/data/gifs', express.static(path.join(__dirname, '../data/gifs')))
+// Serve fitness GIFs as static files (immutable media — cache aggressively)
+app.use('/data/gifs', express.static(path.join(__dirname, '../data/gifs'), { maxAge: '7d', immutable: true }))
 
 // Serve screensaver videos and thumbnails
-app.use('/screensaver', express.static(path.join(__dirname, '../public/screensaver')))
+app.use('/screensaver', express.static(path.join(__dirname, '../public/screensaver'), { maxAge: '7d' }))
 
 // Spotify token endpoint for Web Playback SDK
 app.get('/spotify/token', async (req, res) => {
@@ -160,50 +185,6 @@ app.get('/spotify/token', async (req, res) => {
   } catch (err) {
     res.json({ token: null, connected: false, error: err.message })
   }
-})
-
-// YouTube player closed notification from frontend
-app.post('/api/youtube/closed', (req, res) => {
-  io.emit('youtube-closed')
-  res.json({ success: true })
-})
-
-// Play a YouTube video on the mirror (companion → mirror)
-app.post('/api/youtube/play', async (req, res) => {
-  const { videoId, title, channel, query } = req.body
-  if (videoId) {
-    io.emit('youtube-play', { videoId, title: title || '', channel: channel || '' })
-    return res.json({ success: true, videoId, title })
-  }
-  if (query) {
-    // Search then play first result
-    try {
-      const { google } = require('googleapis')
-      const { getAuthClient } = require('./google-auth')
-      const auth = getAuthClient()
-      if (!auth) {
-        // No Google auth — fallback to AI voice pipeline
-        io.emit('youtube-play', { videoId: 'jNQXAC9IVRw', title: query, channel: '' })
-        return res.json({ success: true, note: 'mock result' })
-      }
-      const yt = google.youtube({ version: 'v3', auth })
-      const searchRes = await yt.search.list({
-        part: ['snippet'], q: query, type: ['video'], maxResults: 1,
-        regionCode: 'IN', safeSearch: 'moderate'
-      })
-      const items = searchRes.data.items || []
-      if (!items.length || !items[0].id?.videoId) {
-        return res.status(404).json({ error: 'No results found' })
-      }
-      const top = items[0]
-      const vid = { videoId: top.id.videoId, title: top.snippet.title, channel: top.snippet.channelTitle }
-      io.emit('youtube-play', vid)
-      return res.json({ success: true, ...vid })
-    } catch (err) {
-      return res.status(500).json({ error: err.message })
-    }
-  }
-  res.status(400).json({ error: 'videoId or query required' })
 })
 
 // PIR motion sensor event from pir.py
@@ -315,12 +296,6 @@ io.on('connection', (socket) => {
     io.emit('widget-toggle', { widget, visible })
   })
 
-  socket.on('youtube-close-from-companion', () => {
-    console.log('[socket] youtube-close-from-companion')
-    io.emit('youtube-close')
-    io.emit('youtube-closed')
-  })
-
   // Karaoke mode events
   socket.on('karaoke:open', () => {
     console.log('[socket] karaoke:open')
@@ -358,6 +333,12 @@ server.listen(PORT, () => {
 
   const scheduler = require('./scheduler')
   scheduler.start(io)
+
+  // Reschedule any reminders that were pending before the last restart.
+  require('./reminders').init(io)
+
+  // Load persisted alarms and start the minute checker.
+  require('./alarms').init(io)
 
   const { setupQuoteCron } = require('./routes/quote')
   setupQuoteCron(io)

@@ -32,7 +32,9 @@ router.post('/state', (req, res) => {
       io.emit('voice-state', { state: 'listening' })
       break
     case 'thinking':
-      io.emit('voice-state', { state: 'listening', text: text ? `"${text}"` : null })
+      // 'processing' is what the dashboard listens for to show the transcript
+      // (see public/js/socket.js). Send the raw text — the client adds quotes.
+      io.emit('voice-state', { state: 'processing', text: text || null })
       break
     case 'speaking':
       io.emit('voice-state', { state: 'responding' })

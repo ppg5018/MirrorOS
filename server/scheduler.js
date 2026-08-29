@@ -193,6 +193,19 @@ function start(io) {
 
   logger.info(`[scheduler] Morning briefing scheduled: "${BRIEFING_CRON}" (Asia/Kolkata)`)
   logger.info(`[scheduler] Next briefing: ${getNextBriefingTime()}`)
+
+  // At local midnight, push a fresh habits view so the widget rolls over to the
+  // new day (today's checkmarks reset while streaks carry over). Derived state
+  // lives in the habits route — we just re-broadcast it.
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      const data = await fetch(`${BASE}/api/habits`).then(r => r.json())
+      if (io) io.emit('habits-updated', data)
+      logger.info('[scheduler] Habits rolled over to new day')
+    } catch (err) {
+      logger.warn(`[scheduler] Habit rollover failed: ${err.message}`)
+    }
+  }, { scheduled: true, timezone: 'Asia/Kolkata' })
 }
 
 function stop() {

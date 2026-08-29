@@ -1,93 +1,38 @@
 const express = require('express')
 const router  = express.Router()
-const fs      = require('fs')
-const path    = require('path')
-const { google } = require('googleapis')
-const { getAuthClient } = require('../google-auth')
 
-const TOKEN_PATH = path.join(__dirname, '../../config/google-token.json')
-
-const MOCK = {
-  unread: 2,
-  previews: [
-    { sender: 'Rahul', subject: 'Project update'    },
-    { sender: 'Bank',  subject: 'Transaction alert' }
-  ],
-  mock: true
-}
+const imapMail = require('../helpers/imap-mail')
 
 const CACHE_MS = 5 * 60 * 1000   // 5 minutes
 let cache = null, cacheAt = 0
 
-// Clear cache on startup so name re-fetches immediately after server restart
+// Clear cache on startup so it re-fetches immediately after server restart
 cache = null; cacheAt = 0
 
+// Email is read over IMAP (app password). Gmail API is intentionally not used
+// (that scope is "restricted" and would require Google's CASA assessment).
+async function fromImap() {
+  const data = await imapMail.getUnreadSummary()
+  return { ...data, configured: true, source: 'imap' }
+}
+
 router.get('/', async (req, res) => {
+  // Email not set up → clean empty state, NO warning on the dashboard
+  if (!imapMail.isConfigured()) {
+    return res.json({ unread: 0, previews: [], configured: false })
+  }
+
   // Serve cache if fresh
   if (cache && Date.now() - cacheAt < CACHE_MS) return res.json(cache)
 
-  const auth = getAuthClient()
-  if (!auth) return res.json(MOCK)
-
   try {
-    const gmail = google.gmail({ version: 'v1', auth })
-
-    // Unread count
-    const list = await gmail.users.messages.list({
-      userId: 'me',
-      q: 'is:unread is:inbox',
-      maxResults: 10
-    })
-
-    const messages = list.data.messages || []
-    const unread   = list.data.resultSizeEstimate || 0
-
-    // Fetch subject + sender for first 3 unread
-    const previews = []
-    for (const msg of messages.slice(0, 3)) {
-      const detail = await gmail.users.messages.get({
-        userId: 'me',
-        id: msg.id,
-        format: 'metadata',
-        metadataHeaders: ['From', 'Subject']
-      })
-      const headers = detail.data.payload.headers
-      const from    = headers.find(h => h.name === 'From')?.value    || ''
-      const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)'
-
-      // Extract name from "Name <email@domain.com>"
-      const sender = from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() || from
-
-      // internalDate is Unix ms string from Gmail
-      const date = detail.data.internalDate
-        ? new Date(parseInt(detail.data.internalDate, 10)).toISOString()
-        : null
-
-      previews.push({ sender, subject, date, unread: true })
-    }
-
-    // Fetch user's real display name + email via OAuth2 userinfo
-    let name = null, email = null
-    try {
-      const oauth2   = google.oauth2({ version: 'v2', auth })
-      const userinfo = await oauth2.userinfo.get()
-      name  = userinfo.data.given_name || userinfo.data.name || null
-      email = userinfo.data.email || null
-    } catch (e) { /* non-fatal */ }
-
-    cache = { unread, previews, name, email }
+    cache   = await fromImap()
     cacheAt = Date.now()
-    res.json(cache)
-
+    return res.json(cache)
   } catch (err) {
-    console.error('[gmail] API error:', err.message)
-    // Expired/revoked token — delete it so the next request falls to MOCK cleanly
-    if (err.message?.includes('invalid_grant') || err.code === 400) {
-      try { fs.unlinkSync(TOKEN_PATH) } catch (_) {}
-      console.error('[gmail] Token invalid — deleted. Re-run: node server/google-auth.js')
-      cache = null; cacheAt = 0
-    }
-    res.json({ ...MOCK, error: err.message })
+    console.error('[gmail] IMAP error:', err.message)
+    // Configured but currently failing — surface a real, email-specific warning
+    return res.json({ unread: 0, previews: [], configured: true, error: err.message })
   }
 })
 

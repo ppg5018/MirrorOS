@@ -1,7 +1,6 @@
 /* ============================================
    MirrorOS — media.js
-   YouTube / Spotify media control
-   Playwright YouTube + Spotify Web API come Day 14
+   Media status bar + voice-pause bridge (Spotify)
    ============================================ */
 
 let mediaState = {
@@ -10,20 +9,20 @@ let mediaState = {
   title: null
 }
 
-async function playMedia(query, platform = 'youtube') {
+async function playMedia(query, platform = 'spotify') {
   try {
-    // Route through voice → Claude → play_media tool
+    // Route through voice → Claude → play_music tool
     const res = await fetch('/api/voice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: `play ${query} on ${platform}` })
+      body: JSON.stringify({ text: `play ${query}` })
     })
     const data = await res.json()
 
     mediaState = { playing: true, platform, title: query }
     updateMediaStatusBar()
 
-    console.log('[media] play:', query, 'on', platform, '→', data.reply)
+    console.log('[media] play:', query, '→', data.reply)
     return data
   } catch (err) {
     console.error('[media] playMedia error:', err)
@@ -61,21 +60,33 @@ function updateMediaStatusBar() {
   }
 }
 
-// IMPORTANT: YouTube must pause before Whisper STT loads (RAM constraint)
-function pauseForVoice() {
-  if (mediaState.playing) {
-    console.log('[media] pausing media for voice input')
-    // Playwright YouTube pause call goes here Day 14
+// IMPORTANT: media must pause before Whisper STT loads (RAM constraint)
+// and so playing music doesn't bleed into the mic during recording.
+async function pauseForVoice() {
+  try {
+    const np = await fetch('/api/spotify/now-playing').then(r => r.json())
+    if (!np.playing) return
     mediaState._wasPaused = true
+    console.log('[media] pausing Spotify for voice input')
+    fetch('/api/spotify/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'pause' })
+    }).catch(() => {})
+  } catch (err) {
+    console.error('[media] pauseForVoice error:', err)
   }
 }
 
 function resumeAfterVoice() {
-  if (mediaState._wasPaused) {
-    console.log('[media] resuming media after voice')
-    mediaState._wasPaused = false
-    // Playwright YouTube resume call goes here Day 14
-  }
+  if (!mediaState._wasPaused) return
+  mediaState._wasPaused = false
+  console.log('[media] resuming Spotify after voice')
+  fetch('/api/spotify/control', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'resume' })
+  }).catch(() => {})
 }
 
 // ── Socket-driven media pause (triggered by wakeword.py) ───

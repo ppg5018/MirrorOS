@@ -21,6 +21,8 @@ router.post('/spotify-start', (req, res) => {
 router.get('/status', (req, res) => {
   const { getAuthClient } = require('../google-auth')
   const { getMirrorBaseURL, getLanIP } = require('../utils/network')
+  const imapMail = require('../helpers/imap-mail')
+  const icalCal  = require('../helpers/ical-calendar')
 
   const spotifyPath   = path.join(__dirname, '../../config/spotify-token.json')
   const whatsappPath  = path.join(__dirname, '../../config/whatsapp-auth')
@@ -30,6 +32,11 @@ router.get('/status', (req, res) => {
   const spotifyConnected  = fs.existsSync(spotifyPath)
   const whatsappConnected = fs.existsSync(whatsappPath) &&
     fs.readdirSync(whatsappPath).length > 0
+
+  // Calendar comes from Google sign-in (calendar scope) OR an iCal link.
+  // Email is IMAP-only (Gmail API would need CASA), so it doesn't count Google.
+  const emailConnected    = imapMail.isConfigured()
+  const calendarConnected = icalCal.isConfigured() || googleConnected
 
   let userConfig = {}
   try { userConfig = JSON.parse(fs.readFileSync(userConfigPath, 'utf8')) } catch (e) {}
@@ -41,13 +48,98 @@ router.get('/status', (req, res) => {
       wifi:        true,
       apiKeys:     !!(process.env.CLAUDE_API_KEY && process.env.OPENWEATHER_API_KEY),
       userProfile: !!(userConfig.name && userConfig.city),
-      google:      googleConnected,
+      email:       emailConnected,
+      calendar:    calendarConnected,
+      google:      googleConnected,   // legacy indicator
       spotify:     spotifyConnected,
       whatsapp:    whatsappConnected,
       wakeWord:    !!(process.env.WAKE_WORD_PATH || process.env.PORCUPINE_ACCESS_KEY),
-      complete:    !!(googleConnected && userConfig.name)
+      complete:    !!userConfig.name
     }
   })
+})
+
+// POST /api/setup/imap — save Gmail IMAP app-password credentials
+// Body: { email, appPassword, host?, port?, name? }
+router.post('/imap', async (req, res) => {
+  const { email, appPassword, host, port, name } = req.body || {}
+  if (!email || !appPassword) {
+    return res.status(400).json({ error: 'email and appPassword are required' })
+  }
+
+  const cfg = {
+    email:       String(email).trim(),
+    appPassword: String(appPassword).replace(/\s+/g, ''),  // Google shows it spaced
+    host:        (host && String(host).trim()) || 'imap.gmail.com',
+    port:        parseInt(port, 10) || 993,
+    name:        (name && String(name).trim()) || undefined
+  }
+
+  const cfgPath = path.join(__dirname, '../../config/imap.json')
+  fs.mkdirSync(path.dirname(cfgPath), { recursive: true })
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2))
+
+  // Best-effort live verification so the phone gets instant feedback
+  let verified = false, warning
+  try {
+    const imapMail = require('../helpers/imap-mail')
+    await imapMail.getUnreadSummary({ previewCount: 1, timeoutMs: 10000 })
+    verified = true
+  } catch (err) {
+    warning = 'Saved, but a test connection failed: ' + err.message +
+      ' — check that 2-Step Verification is on and the App Password is correct.'
+  }
+
+  const io = req.app.get('io')
+  if (io) io.emit('setup:step-complete', { step: 'email', success: verified })
+
+  res.json({ success: true, verified, warning })
+})
+
+// POST /api/setup/calendar — save the Google Calendar secret iCal URL
+// Body: { icalUrl }  (or { icalUrls: [] })
+router.post('/calendar', async (req, res) => {
+  const { icalUrl, icalUrls } = req.body || {}
+  const urls = Array.isArray(icalUrls) ? icalUrls.filter(Boolean)
+             : (icalUrl ? [String(icalUrl).trim()] : [])
+
+  if (!urls.length) return res.status(400).json({ error: 'icalUrl is required' })
+  if (!urls.every(u => /^https?:\/\/.+\.ics(\?.*)?$/i.test(u) || u.includes('/ical/'))) {
+    return res.status(400).json({ error: 'That does not look like an iCal (.ics) URL' })
+  }
+
+  const cfg = urls.length > 1 ? { icalUrls: urls } : { icalUrl: urls[0] }
+  const cfgPath = path.join(__dirname, '../../config/calendar.json')
+  fs.mkdirSync(path.dirname(cfgPath), { recursive: true })
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2))
+
+  // Best-effort fetch to validate the feed
+  let verified = false, warning, count = 0
+  try {
+    const icalCal = require('../helpers/ical-calendar')
+    const { events } = await icalCal.getTodayEvents({ timeoutMs: 10000 })
+    verified = true; count = events.length
+  } catch (err) {
+    warning = 'Saved, but fetching the feed failed: ' + err.message
+  }
+
+  const io = req.app.get('io')
+  if (io) io.emit('setup:step-complete', { step: 'calendar', success: verified })
+
+  res.json({ success: true, verified, todayEventCount: count, warning })
+})
+
+// POST /api/setup/spotify-device — set the Connect device name Mira targets
+// Body: { name }
+router.post('/spotify-device', (req, res) => {
+  const { name } = req.body || {}
+  if (!name) return res.status(400).json({ error: 'name is required' })
+
+  const cfgPath = path.join(__dirname, '../../config/spotify-device.json')
+  fs.mkdirSync(path.dirname(cfgPath), { recursive: true })
+  fs.writeFileSync(cfgPath, JSON.stringify({ name: String(name).trim() }, null, 2))
+
+  res.json({ success: true, name: String(name).trim() })
 })
 
 // POST /api/setup/user-profile
@@ -162,10 +254,8 @@ router.get('/google-auth-url-for-phone', (req, res) => {
     prompt:      'consent',
     scope: [
       'openid', 'profile', 'email',
-      'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/tasks',
-      'https://www.googleapis.com/auth/youtube.readonly'
+      'https://www.googleapis.com/auth/tasks'
     ],
     state
   })
@@ -224,17 +314,22 @@ router.post('/google-paste-url', async (req, res) => {
 
 // GET /api/setup/google-auth-url/instructions
 router.get('/google-auth-url/instructions', (req, res) => {
-  const { getGoogleRedirectURI, getMirrorBaseURL } = require('../utils/network')
+  const { getMirrorBaseURL } = require('../utils/network')
+
+  // MUST match the redirect_uri the phone sign-in flow actually sends
+  // (see /google-auth-url-for-phone) or Google returns redirect_uri_mismatch.
+  // It's a loopback URI, so the same value works on every unit.
+  const redirectURI = `http://127.0.0.1:${process.env.PORT || 3000}/auth/google/callback`
 
   res.json({
-    redirectURI: getGoogleRedirectURI(),
-    mirrorURL:   getMirrorBaseURL(),
+    redirectURI,
+    mirrorURL: getMirrorBaseURL(),
     instructions: [
       'Go to console.cloud.google.com',
       'Open your project → APIs & Services → Credentials',
-      'Click your OAuth 2.0 Client ID',
+      'Click your OAuth 2.0 Client ID (type: Web application)',
       'Under "Authorized redirect URIs" click Add URI',
-      getGoogleRedirectURI(),
+      redirectURI,
       'Click Save, then try Google sign-in again'
     ]
   })
@@ -279,7 +374,7 @@ router.get('/spotify-auth-url', (req, res) => {
     response_type: 'code',
     client_id:     process.env.SPOTIFY_CLIENT_ID,
     scope: [
-      'streaming', 'user-read-email', 'user-read-private',
+      'user-read-email', 'user-read-private',
       'user-read-playback-state', 'user-modify-playback-state',
       'user-read-currently-playing', 'playlist-read-private',
       'playlist-read-collaborative', 'user-library-read',

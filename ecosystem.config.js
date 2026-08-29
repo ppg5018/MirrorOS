@@ -8,8 +8,11 @@ module.exports = {
       restart_delay: 3000,
       max_restarts: 10,
       min_uptime: '10s',
-      // Pi 3B has 1GB — cap Node at 512MB so Chromium + Python have room
-      node_args: '--max-old-space-size=512 --optimize-for-size',
+      // Pi 4 1GB — Chromium kiosk + Python (voice/PIR) need the bulk of RAM, so
+      // cap the Node old-space at 256MB. max_memory_restart is a safety net that
+      // recycles the backend if RSS ever creeps past ~320MB (prevents OOM).
+      node_args: '--max-old-space-size=256 --optimize-for-size',
+      max_memory_restart: '320M',
       out_file: '/var/log/mirroros/backend-out.log',
       error_file: '/var/log/mirroros/backend-err.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss',

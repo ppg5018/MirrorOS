@@ -3,6 +3,8 @@ const router  = express.Router()
 const fs      = require('fs')
 const path    = require('path')
 
+const { isValidWorkoutId, safeWorkoutPath } = require('../utils/safe-path')
+
 const DATA_DIR       = path.join(__dirname, '../../data')
 const WORKOUTS_DIR   = path.join(DATA_DIR, 'workouts')
 const EXERCISES_PATH = path.join(DATA_DIR, 'exercises.json')
@@ -63,7 +65,8 @@ router.get('/workouts', (req, res) => {
 // ── GET /api/fitness/workouts/:id — full enriched workout ──
 router.get('/workouts/:id', (req, res) => {
   try {
-    const filePath = path.join(WORKOUTS_DIR, req.params.id + '.json')
+    const filePath = safeWorkoutPath(WORKOUTS_DIR, req.params.id)
+    if (!filePath) return res.status(400).json({ error: 'Invalid workout id' })
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Workout not found' })
     }
@@ -189,10 +192,13 @@ router.post('/workouts', (req, res) => {
     const workout = req.body
     if (!workout || !workout.name) return res.status(400).json({ error: 'name required' })
 
-    const id       = workout.id || ('custom-' + Date.now())
+    const id = workout.id || ('custom-' + Date.now())
+    // Reject ids containing path separators / .. so a write can never escape
+    // the workouts directory.
+    const filePath = safeWorkoutPath(WORKOUTS_DIR, id)
+    if (!filePath) return res.status(400).json({ error: 'Invalid workout id' })
     workout.id     = id
     const filename = id + '.json'
-    const filePath = path.join(WORKOUTS_DIR, filename)
 
     fs.mkdirSync(WORKOUTS_DIR, { recursive: true })
     fs.writeFileSync(filePath, JSON.stringify(workout, null, 2))

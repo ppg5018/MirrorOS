@@ -2,9 +2,9 @@ const express = require('express')
 const router  = express.Router()
 
 const TRACKS = [
-  { title: 'Tum Se Hi',        artist: 'Mohit Chauhan',  album: 'Jab We Met',    source: 'youtube', duration: 214, coverColor: '#4a9cf0' },
+  { title: 'Tum Se Hi',        artist: 'Mohit Chauhan',  album: 'Jab We Met',    source: 'spotify', duration: 214, coverColor: '#4a9cf0' },
   { title: 'Blinding Lights',  artist: 'The Weeknd',     album: 'After Hours',   source: 'spotify', duration: 200, coverColor: '#f04a4a' },
-  { title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal', album: 'Shershaah OST', source: 'youtube', duration: 253, coverColor: '#4af0c4' },
+  { title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal', album: 'Shershaah OST', source: 'spotify', duration: 253, coverColor: '#4af0c4' },
 ]
 
 let trackIndex = 0

@@ -6,7 +6,7 @@
  * Usage: node scripts/google-auth.js
  */
 
-console.log('ℹ️  If you are re-running this to add YouTube scopes,')
+console.log('ℹ️  If you are re-running this to change Google scopes,')
 console.log('   delete config/google-token.json first, then run this script.')
 console.log('   You will need to sign in again.\n')
 
@@ -24,8 +24,6 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/youtube.force-ssl'
 ]
 
 const TOKEN_PATH   = path.join(__dirname, '../config/google-token.json')
@@ -53,7 +51,7 @@ async function main() {
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
       await gmail.users.getProfile({ userId: 'me' })
       console.log('Token is valid — Google OAuth is already set up.')
-      console.log('Gmail, Calendar, Tasks, and YouTube will show real data.')
+      console.log('Gmail, Calendar, and Tasks will show real data.')
       process.exit(0)
     } catch (e) {
       console.log('Token expired or revoked — getting a new one...')
@@ -107,7 +105,7 @@ async function main() {
           <html>
           <body style="font-family:sans-serif;text-align:center;padding:60px;background:#000;color:#fff">
             <h2 style="color:#4af0c4">MirrorOS Connected!</h2>
-            <p>Gmail, Calendar, Tasks, and YouTube are now connected.</p>
+            <p>Gmail, Calendar, and Tasks are now connected.</p>
             <p style="color:#888">You can close this tab.</p>
           </body>
           </html>
@@ -151,7 +149,7 @@ async function main() {
   })
 
   console.log('\nGoogle OAuth complete!')
-  console.log('Gmail, Calendar, Tasks, and YouTube will now show real data.')
+  console.log('Gmail, Calendar, and Tasks will now show real data.')
   console.log('\nRestart the server: npm start')
 }
 

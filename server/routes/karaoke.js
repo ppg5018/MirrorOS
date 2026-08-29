@@ -1,11 +1,12 @@
 const express = require('express')
 const router  = express.Router()
+const BoundedCache = require('../utils/bounded-cache')
 
 const LRCLIB = 'https://lrclib.net/api/get'
 
-// ── In-memory cache — key: "artist::track", TTL: 24h ────────
-const lyricsCache = {}
+// ── In-memory cache — key: "artist::track", TTL: 24h, max 60 tracks ────────
 const CACHE_TTL   = 24 * 60 * 60 * 1000
+const lyricsCache = new BoundedCache({ max: 60, ttl: CACHE_TTL })
 
 // Convert LRC timestamp [mm:ss.xx] or inline <mm:ss.xx> → ms
 function lrcTimeToMs(mm, ss, cs) {
@@ -66,10 +67,8 @@ router.get('/lyrics', async (req, res) => {
   }
 
   const cacheKey = (artist + '::' + track).toLowerCase()
-  const cached   = lyricsCache[cacheKey]
-  if (cached && Date.now() - cached.t < CACHE_TTL) {
-    return res.json(cached.data)
-  }
+  const cached   = lyricsCache.get(cacheKey)
+  if (cached) return res.json(cached)
 
   try {
     const url = new URL(LRCLIB)
@@ -83,7 +82,7 @@ router.get('/lyrics', async (req, res) => {
 
     if (resp.status === 404) {
       const result = { error: 'not_found' }
-      lyricsCache[cacheKey] = { data: result, t: Date.now() }
+      lyricsCache.set(cacheKey, result)
       return res.json(result)
     }
 
@@ -107,7 +106,7 @@ router.get('/lyrics', async (req, res) => {
       result = { error: 'not_found' }
     }
 
-    lyricsCache[cacheKey] = { data: result, t: Date.now() }
+    lyricsCache.set(cacheKey, result)
     res.json(result)
 
   } catch (err) {

@@ -15,15 +15,16 @@ const path = require('path')
 
 const TOKEN_PATH = path.join(__dirname, '../config/google-token.json')
 
+// Calendar-only (plus Tasks) — both are "sensitive" scopes, so the app needs a
+// one-time OAuth verification but NO paid CASA security assessment. Gmail is a
+// "restricted" scope (would require CASA), so email is handled over IMAP
+// instead — not via this token.
 const SCOPES = [
   'openid',
   'profile',
   'email',
-  'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/youtube.force-ssl',
 ]
 
 function getAuthClient() {

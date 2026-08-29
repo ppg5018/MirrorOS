@@ -1,6 +1,11 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const functions = require('./functions')
 
+// Verbose per-query tracing (full history/message JSON dumps) is expensive on a
+// Pi and only useful while debugging. Off unless DEBUG_AI=1.
+const AI_DEBUG = process.env.DEBUG_AI === '1'
+function dbg(...args) { if (AI_DEBUG) console.log(...args) }
+
 const SYSTEM_PROMPT = `You are MirrorOS, an AI assistant built into a smart mirror in Pune, India.
 
 STRICT RULES for every response:
@@ -16,14 +21,6 @@ STRICT RULES for every response:
 - If user says "change X to Y" or "replace X with Y" for a task: call complete_task for X, then add_task for Y. Do both in sequence.
 - To finish/remove/delete/complete any task always use complete_task — it crosses it off with a checkmark.
 
-YOUTUBE RULES:
-- The user is signed in with their Google account which includes YouTube access.
-- You have access to their YouTube watch history and subscriptions via that account.
-- When they say "play that video I was watching" or "continue where I left off" → use action: play_from_history.
-- When they say "play something from [channel name]" → use action: play_from_subscriptions with query = channel name.
-- When they say "play [song/video name] on YouTube" → use action: search_and_play.
-- Never mention API keys, tokens, or OAuth to the user.
-
 SPOTIFY RULES:
 - The user is logged in to Spotify with their own account.
 - You have access to their personal library: recently played, liked songs, top tracks, and playlists.
@@ -32,7 +29,7 @@ SPOTIFY RULES:
   "play my liked songs" / "play favourites"             → play_music with action: play_liked_songs
   "what was I listening to" / "play that again"         → play_music with action: play_recently_played
   "play my [name] playlist"                             → play_music with action: play_playlist, query=name
-  "play [song/artist/album]" (no YouTube mentioned)     → play_music with action: search_and_play
+  "play [song/artist/album]"     → play_music with action: search_and_play
   "pause" / "stop music"                                → play_music with action: pause
   "resume" / "continue playing"                         → play_music with action: resume
   "next song" / "skip"                                  → play_music with action: next
@@ -79,9 +76,62 @@ KARAOKE RULES:
 - "close karaoke" / "exit lyrics" / "go back"            → karaoke_control action: close
 - Never say you can't show lyrics — always try.
 
+ALARM RULES (wall-clock alarms that ring at a set time — separate from set_reminder, which speaks a one-off message):
+- "set an alarm for 7" / "wake me at 6:30" / "alarm for 7 am"        → alarm_control action: set, time in HH:MM 24h (convert spoken times: "7 am"→"07:00", "6:30 pm"→"18:30"). Default repeat: once.
+- "every day at 7" / "daily alarm at 6:45"                            → alarm_control action: set, repeat: daily
+- "on weekdays at 7" / "every weekday"                                → alarm_control action: set, repeat: weekdays
+- "on weekends at 9"                                                  → alarm_control action: set, repeat: weekends
+- name it if the user gives one: "gym alarm at 6" → label: "gym"
+- "what alarms do I have" / "list my alarms" / "when's my alarm"      → alarm_control action: list
+- "delete the 7 am alarm" / "remove my gym alarm" / "cancel all alarms" → alarm_control action: delete, query="7:00" or label or "all"
+- "turn off the 7 alarm" / "disable my alarms"                        → alarm_control action: disable, query=...
+- "turn on the 7 alarm" / "enable my morning alarm"                   → alarm_control action: enable, query=...
+- "snooze" / "snooze for 5 minutes" / "5 more minutes"               → alarm_control action: snooze, minutes (default 9)
+- "stop" / "dismiss" / "turn it off" / "I'm up" (while an alarm is ringing) → alarm_control action: stop
+- When listing, say it warmly in one sentence: each alarm's time, whether it repeats, and if any is off.
+- Never say you can't set an alarm — always try.
+
 SCREENSAVER RULES:
 - "screensaver" / "start screensaver" / "go to sleep" / "sleep mode" / "screen off" / "lights off" / "start sleep mode" / "goodnight mirror" → screensaver_control action: enter
-- "wake up" / "I'm back" / "exit screensaver" / "turn on" → screensaver_control action: exit`
+- "wake up" / "I'm back" / "exit screensaver" / "turn on" → screensaver_control action: exit
+
+WIDGET / PANEL CONTROL — anything visible on screen can be shown, hidden, or highlighted:
+- "hide the [panel]" / "remove [panel]" / "get rid of [panel]"   → control_widget action: hide, widget=[name]
+- "show the [panel]" / "bring back [panel]" / "display [panel]"  → control_widget action: show, widget=[name]
+- "highlight [panel]" / "point out [panel]" / "focus [panel]"    → control_widget action: highlight, widget=[name]
+- "hide everything" / "clean screen" / "declutter"               → control_widget action: hide, widget=all
+- "show everything" / "bring it all back"                        → control_widget action: show, widget=all
+- Valid widget names: clock, weather, calendar, tasks, notifications, music, quote, news, photos, wallpaper, ai-bar.
+  Map synonyms yourself: messages/whatsapp/email → notifications; schedule/agenda/events → calendar; todos → tasks; song/spotify → music; headlines → news; ambient art/slideshow/photos → photos.
+
+DISPLAY CONTROL (the mirror's screen, NOT the LED backlight):
+- "dim the screen" / "dim the mirror" / "darker" / "too bright"   → control_display action: dim
+- "brighter" / "brighten" / "full brightness"                     → control_display action: brighten
+- "set brightness to N" / "screen brightness N percent"           → control_display action: set_brightness, value=N
+- "clear the wallpaper" / "remove the wallpaper" / "reset ambient art" → control_display action: clear_wallpaper
+- NOTE: "backlight" / "LED" / colour words like "warm/party/red" → set_backlight (the light strip), NOT control_display.
+
+HABIT RULES (recurring habits with streaks — separate from one-off tasks):
+- Habits are things the user wants to do regularly (e.g. drink water, meditate, read, gym). Anything phrased as a "habit", a "streak", or "every day I..." maps to manage_habits, NOT tasks.
+- "add a habit to [X]" / "track [X] every day" / "start a [X] habit"        → manage_habits action: add, name=X (optional emoji, optional target count)
+- "mark [X] done" / "I did [X]" / "I drank water" / "[X] ho gaya" (when X is a habit) → manage_habits action: check, name=X
+- "undo [X]" / "unmark [X]" / "I didn't do [X] after all"                    → manage_habits action: uncheck, name=X
+- "remove the [X] habit" / "delete my [X] habit" / "stop tracking [X]"       → manage_habits action: remove, name=X
+- "what are my habits" / "how are my habits" / "how's my streak" / "did I do everything today" → manage_habits action: list
+- When listing, speak it warmly in one sentence: which are done, and call out any good streaks.
+- If a name matches both a task and a habit, prefer the habit only when the user says "habit" or "streak"; otherwise treat it as a task.
+
+TASK DELETE vs COMPLETE:
+- "delete X" / "remove X from the list" / "erase X" / "get rid of the task X"  → delete_task (removes it entirely)
+- "X done" / "finished X" / "mark X complete" / "X ho gaya"                    → complete_task (crosses it off with a checkmark)
+
+VOLUME:
+- "louder" / "turn it up" / "volume up"       → play_music action: volume_up
+- "quieter" / "turn it down" / "volume down"  → play_music action: volume_down
+- "set volume to N" / "volume N"              → play_music action: volume, volume=N
+
+HELP / DISCOVERY:
+- If asked "what can you do" / "what can I say" / "help" / "what are my commands": answer briefly in one flowing sentence that you can tell them the weather, calendar, tasks and messages; play music or karaoke; run workouts; set alarms, reminders and read the news or a quote; control the photo slideshow, wallpaper and screen brightness; change the backlight; and show, hide or highlight any panel on the mirror — then invite them to just say what they want. Do NOT call a tool for this.`
 
 // ── Conversation memory ──────────────────────────────────────
 const MAX_EXCHANGES = 5
@@ -98,8 +148,6 @@ let lastToolContext = null
 let lastActivityAt = Date.now()
 
 const RESET_PHRASES = ['clear history', 'forget that', 'start over', 'nevermind', 'never mind', 'reset', 'new conversation']
-
-const CLOSE_VIDEO_PHRASES = ['close video', 'close youtube', 'go back', 'stop video', 'exit video', 'back to mirror', 'dismiss', 'close player']
 
 function pruneHistory() {
   if (Date.now() - lastActivityAt > CONTEXT_TTL) {
@@ -159,17 +207,21 @@ const TOOL_TO_WIDGET = {
   get_whatsapp_messages: 'notifications',
   add_task:              'tasks',
   complete_task:         'tasks',
-  play_youtube:          'youtube',
   play_music:            'music',
   set_backlight:         'backlight',
   morning_briefing:      'all',
   get_news:              'ai-bar',
   set_reminder:          'ai-bar',
   get_quote:             'quote',
+  alarm_control:         'alarm',
   control_slideshow:     null,
   fitness_control:       'fitness',
   karaoke_control:       null,
-  screensaver_control:   null
+  screensaver_control:   null,
+  delete_task:           'tasks',
+  manage_habits:         'habits',
+  control_widget:        null,   // targets an arbitrary panel — handled by the tool itself
+  control_display:       null
 }
 
 const tools = [
@@ -259,6 +311,8 @@ const tools = [
             'next',
             'prev',
             'volume',
+            'volume_up',
+            'volume_down',
             'shuffle'
           ]
         },
@@ -288,6 +342,42 @@ const tools = [
         time: { type: 'string', description: 'Time in HH:MM 24-hour format' }
       },
       required: ['message', 'time']
+    }
+  },
+  {
+    name: 'alarm_control',
+    description: 'Set, list, delete, enable/disable, snooze, or dismiss alarms. Everything about alarms is controlled here.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['set', 'list', 'delete', 'enable', 'disable', 'snooze', 'stop'],
+          description: 'set: create an alarm | list: read out alarms | delete: remove alarm(s) | enable/disable: turn alarm(s) on/off | snooze: snooze the ringing alarm | stop: dismiss the ringing alarm'
+        },
+        time: {
+          type: 'string',
+          description: 'Alarm time in HH:MM 24-hour format (e.g. "07:00", "18:30"). Required for action=set.'
+        },
+        label: {
+          type: 'string',
+          description: 'Optional name for the alarm (e.g. "gym", "wake up"). Only for action=set.'
+        },
+        repeat: {
+          type: 'string',
+          enum: ['once', 'daily', 'weekdays', 'weekends'],
+          description: 'How often the alarm repeats. Defaults to once. Only for action=set.'
+        },
+        query: {
+          type: 'string',
+          description: 'Which alarm to target for delete/enable/disable — a time like "7:00", a label, or "all". Defaults to all.'
+        },
+        minutes: {
+          type: 'number',
+          description: 'Snooze duration in minutes. Only for action=snooze. Defaults to 9.'
+        }
+      },
+      required: ['action']
     }
   },
   {
@@ -326,25 +416,6 @@ const tools = [
         }
       },
       required: ['refresh']
-    }
-  },
-  {
-    name: 'play_youtube',
-    description: "Search and play YouTube videos on the mirror, or play from the user's watch history or subscriptions",
-    input_schema: {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['search_and_play', 'play_from_history', 'play_from_subscriptions', 'close'],
-          description: 'search_and_play: search by query | play_from_history: play from watch history | play_from_subscriptions: play from a subscribed channel | close: dismiss player'
-        },
-        query: {
-          type: 'string',
-          description: "Search term, history keyword, or channel name depending on action. e.g. 'lo-fi hip hop', 'Kesariya', 'Tanmay Bhat'"
-        }
-      },
-      required: ['action']
     }
   },
   {
@@ -396,6 +467,82 @@ const tools = [
       },
       required: ['action']
     }
+  },
+  {
+    name: 'control_widget',
+    description: 'Show, hide, or highlight any visible panel/widget on the mirror dashboard. Use for "hide the weather", "show my tasks", "highlight the calendar", "hide everything", etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['show', 'hide', 'highlight'],
+          description: 'show or hide the panel, or briefly highlight it to draw attention'
+        },
+        widget: {
+          type: 'string',
+          description: 'Which panel: clock, weather, calendar, tasks, notifications, music, quote, news, photos, wallpaper, ai-bar, or "all" for every content panel. Map synonyms (messages→notifications, schedule→calendar, etc.).'
+        }
+      },
+      required: ['action', 'widget']
+    }
+  },
+  {
+    name: 'control_display',
+    description: "Control the mirror's screen brightness (a dimming overlay) and the ambient-art wallpaper. NOT the LED backlight strip.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['dim', 'brighten', 'set_brightness', 'clear_wallpaper'],
+          description: 'dim/brighten step the screen; set_brightness uses value; clear_wallpaper removes the ambient art image'
+        },
+        value: {
+          type: 'number',
+          description: 'Brightness percent 10-100. Only for action=set_brightness.'
+        }
+      },
+      required: ['action']
+    }
+  },
+  {
+    name: 'delete_task',
+    description: 'Permanently delete a task from the list (removes it entirely). Use for "delete X", "remove X from the list", "erase X". For marking something finished/done instead, use complete_task.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text of the task to delete (partial match is fine)' }
+      },
+      required: ['text']
+    }
+  },
+  {
+    name: 'manage_habits',
+    description: 'Manage recurring daily habits with streaks (separate from one-off tasks). Create a habit, mark it done or undone for today, remove it, or list all habits with their streaks. Use for anything about "habits", "streaks", or things done "every day".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['add', 'check', 'uncheck', 'remove', 'list', 'status'],
+          description: 'add: create a habit | check: mark done today | uncheck: undo today | remove: delete the habit | list/status: read out all habits and streaks'
+        },
+        name: {
+          type: 'string',
+          description: 'Habit name (e.g. "drink water", "meditate"). Required for add, check, uncheck, remove.'
+        },
+        emoji: {
+          type: 'string',
+          description: 'Optional single emoji icon for the habit (only for action=add).'
+        },
+        target: {
+          type: 'number',
+          description: 'Optional daily target count, e.g. 8 for eight glasses of water. Defaults to 1. Only for action=add.'
+        }
+      },
+      required: ['action']
+    }
   }
 ]
 
@@ -405,12 +552,10 @@ async function processQuery(userText, io) {
 
   const client = new Anthropic({ apiKey })
 
-  // ── DIAGNOSTIC LOGS (remove after confirming context works) ──
-  console.log('\n─── NEW QUERY ───')
-  console.log('Input:', userText)
-  console.log('History before this query:', JSON.stringify(conversationHistory, null, 2))
-  console.log('lastToolContext:', JSON.stringify(lastToolContext))
-  // ─────────────────────────────────────────────────────────────
+  dbg('\n─── NEW QUERY ───')
+  dbg('Input:', userText)
+  dbg('History before this query:', JSON.stringify(conversationHistory, null, 2))
+  dbg('lastToolContext:', JSON.stringify(lastToolContext))
 
   // 1. Prune stale history
   pruneHistory()
@@ -425,26 +570,16 @@ async function processQuery(userText, io) {
     return { reply, historyDepth: 0 }
   }
 
-  // 2b. Close video phrases — dismiss YouTube overlay immediately
-  if (CLOSE_VIDEO_PHRASES.some(p => lowerText.includes(p))) {
-    if (io) io.emit('youtube-close')
-    const reply = 'Going back to the mirror.'
-    if (io) io.emit('ai-response', { text: reply, highlightWidget: null, historyDepth: Math.floor(conversationHistory.length / 2) })
-    return { reply, historyDepth: Math.floor(conversationHistory.length / 2) }
-  }
-
   // 3. Cached system prompt
   const cachedSystem = [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]
 
   // 4. Build enriched messages — injects lastToolContext into the user message
   const messages = buildMessages(userText)
 
-  // ── DIAGNOSTIC LOG ──
-  console.log('Messages sent to Claude (1st call):', JSON.stringify(messages, null, 2))
-  // ───────────────────
+  dbg('Messages sent to Claude (1st call):', JSON.stringify(messages, null, 2))
 
-  // 5. First Claude call
-  const response = await client.messages.create({
+  // 5. First Claude call  (let — the tool loop below reassigns it)
+  let response = await client.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 1024,
     system: cachedSystem,
@@ -452,86 +587,94 @@ async function processQuery(userText, io) {
     tools
   })
 
-  // ── DIAGNOSTIC LOG ──
-  console.log('Claude 1st response stop_reason:', response.stop_reason)
-  console.log('Claude 1st response content[0] type:', response.content[0]?.type)
-  // ───────────────────
-
-  console.log('[claude] Tokens:', JSON.stringify(response.usage))
+  dbg('Claude 1st response stop_reason:', response.stop_reason)
+  dbg('Claude 1st response content[0] type:', response.content[0]?.type)
+  dbg('[claude] Tokens:', JSON.stringify(response.usage))
 
   let finalReply = ''
   let toolUsedName = null
+  let highlightWidget = null
 
-  if (response.stop_reason === 'tool_use') {
-    const toolUse  = response.content.find(b => b.type === 'tool_use')
-    toolUsedName   = toolUse.name
-    const toolInput = toolUse.input
+  const MAX_TOOL_ITERATIONS = 5
+  let iterations = 0
 
-    console.log(`[claude] tool selected: ${toolUsedName}`, toolInput)
+  // Agentic tool loop. A single assistant turn can contain MULTIPLE tool_use
+  // blocks (e.g. "change X to Y" → complete_task + add_task), and the model may
+  // need several rounds. Every tool_use in a turn must get a matching
+  // tool_result back or the API 400s — so execute them all, then let the model
+  // continue until it returns a plain text answer.
+  while (response.stop_reason === 'tool_use') {
+    const toolUses    = response.content.filter(b => b.type === 'tool_use')
+    const toolResults = []
 
-    // 6. Execute the tool
-    const toolResult    = await functions.execute(toolUsedName, toolInput, io)
-    const toolResultStr = JSON.stringify(toolResult)
-    console.log(`[claude] tool result:`, toolResultStr.slice(0, 200))
+    for (const toolUse of toolUses) {
+      console.log(`[claude] tool selected: ${toolUse.name}`, toolUse.input)
 
-    // 7. Save tool context so the NEXT query can reference "that" / "it" precisely
-    lastToolContext = {
-      toolName:   toolUsedName,
-      toolInput,
-      toolResult: toolResultStr
+      const toolResult    = await functions.execute(toolUse.name, toolUse.input, io)
+      const toolResultStr = JSON.stringify(toolResult)
+      console.log(`[claude] tool result:`, toolResultStr.slice(0, 200))
+
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: toolResultStr
+      })
+
+      // Track most-recent tool for widget highlight + follow-up context
+      // so a later "play that again" knows exactly what "that" was.
+      toolUsedName = toolUse.name
+      if (TOOL_TO_WIDGET[toolUse.name]) highlightWidget = TOOL_TO_WIDGET[toolUse.name]
+      lastToolContext = {
+        toolName:   toolUse.name,
+        toolInput:  toolUse.input,
+        toolResult: toolResultStr
+      }
     }
 
-    // 8. Second Claude call — uses original (non-enriched) user text + proper tool turn structure
-    //    conversationHistory only has plain strings so this messages array is always valid
-    const messages2 = [
-      ...conversationHistory,
-      { role: 'user', content: userText },
-      { role: 'assistant', content: response.content },   // tool_use block — valid here only
-      {
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content: toolResultStr
-        }]
-      }
-    ]
+    // Append the tool turn: assistant's tool_use blocks + our tool_results.
+    messages.push({ role: 'assistant', content: response.content })
+    messages.push({ role: 'user',      content: toolResults })
 
-    // ── DIAGNOSTIC LOG ──
-    console.log('Messages sent to Claude (2nd call):', JSON.stringify(messages2, null, 2))
-    // ───────────────────
+    iterations++
 
-    const finalResponse = await client.messages.create({
+    if (iterations >= MAX_TOOL_ITERATIONS) {
+      // Safety cap — force a final text answer with no further tool calls.
+      response = await client.messages.create({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1024,
+        system: cachedSystem,
+        messages
+      })
+      break
+    }
+
+    response = await client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 1024,
       system: cachedSystem,
-      messages: messages2,
+      messages,
       tools
     })
+    dbg('[claude] Tokens (tool turn):', JSON.stringify(response.usage))
+  }
 
-    console.log('[claude] Tokens (final turn):', JSON.stringify(finalResponse.usage))
-    finalReply = finalResponse.content.find(b => b.type === 'text')?.text || 'Done.'
-
-  } else {
-    // Plain text — no tool used, clear stale tool context
-    finalReply     = response.content.find(b => b.type === 'text')?.text || 'Sure.'
+  if (toolUsedName === null) {
+    // No tool was ever used — clear any stale tool context.
     lastToolContext = null
   }
 
-  // ── DIAGNOSTIC LOG ──
-  console.log('Saving to history — user:', userText)
-  console.log('Saving to history — assistant:', finalReply)
-  // ───────────────────
+  finalReply = response.content.find(b => b.type === 'text')?.text ||
+    (toolUsedName ? 'Done.' : 'Sure.')
+
+  dbg('Saving to history — user:', userText)
+  dbg('Saving to history — assistant:', finalReply)
 
   // 9. Save exchange as plain text strings — always valid for future API calls
   addExchange(userText, finalReply)
 
-  // ── DIAGNOSTIC LOG ──
-  console.log('History after this query:', JSON.stringify(conversationHistory, null, 2))
-  // ───────────────────
+  dbg('History after this query:', JSON.stringify(conversationHistory, null, 2))
 
-  const historyDepth   = Math.floor(conversationHistory.length / 2)
-  const highlightWidget = TOOL_TO_WIDGET[toolUsedName] || null
+  const historyDepth = Math.floor(conversationHistory.length / 2)
 
   if (io) io.emit('ai-response', { text: finalReply, highlightWidget, historyDepth })
 

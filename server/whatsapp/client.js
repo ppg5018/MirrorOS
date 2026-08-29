@@ -18,7 +18,21 @@ const fs = require('fs')
 
 const AUTH_FOLDER = path.join(__dirname, '../../config/whatsapp-auth')
 
+// Cap the number of tracked conversations so a busy account can't grow this
+// map without bound on a 1GB Pi. Keeps the most-recently-active contacts.
+const MAX_CONTACTS = 40
+
 let messageStore = {}
+
+// Evict the least-recently-active conversations beyond MAX_CONTACTS.
+function pruneMessageStore() {
+  const jids = Object.keys(messageStore)
+  if (jids.length <= MAX_CONTACTS) return
+  jids
+    .sort((a, b) => (messageStore[b].lastTime || 0) - (messageStore[a].lastTime || 0))
+    .slice(MAX_CONTACTS)
+    .forEach(jid => { delete messageStore[jid] })
+}
 let sock = null
 let isConnected = false
 let io = null
@@ -66,7 +80,13 @@ async function connectWhatsApp(socketIO) {
 
       if (shouldReconnect) {
         console.log('[WhatsApp] Reconnecting in 5s...')
-        setTimeout(() => connectWhatsApp(io), 5000)
+        // connectWhatsApp is async — without .catch() a failed reconnect
+        // becomes an unhandled rejection that can take the process down.
+        setTimeout(() => {
+          connectWhatsApp(io).catch(err => {
+            console.error('[WhatsApp] Reconnect failed:', err && err.message)
+          })
+        }, 5000)
       } else {
         console.log('[WhatsApp] Logged out. Delete config/whatsapp-auth to reconnect.')
       }
@@ -131,6 +151,8 @@ async function connectWhatsApp(socketIO) {
       messageStore[jid].lastMessage = text
       messageStore[jid].lastTime = msg.messageTimestamp
       messageStore[jid].name = contactName
+
+      pruneMessageStore()
 
       console.log(`[WhatsApp] New message from ${contactName}: ${text.substring(0, 40)}`)
 

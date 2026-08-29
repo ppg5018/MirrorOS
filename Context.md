@@ -41,7 +41,7 @@ MirrorOS is an AI-powered smart mirror built for the Indian market (Pune-first).
 | **At rest total** | **~600 MB** | 424 MB free |
 | **During voice** | **~920 MB** | Only ~100 MB free ⚠️ |
 
-**Critical constraint:** YouTube MUST pause before voice STT runs. Whisper Tiny must be used — not Base, Small, or Medium. React is banned — too heavy. Vanilla JS only.
+**Critical constraint:** Media playback MUST pause before voice STT runs. Whisper Tiny must be used — not Base, Small, or Medium. React is banned — too heavy. Vanilla JS only.
 
 ---
 
@@ -51,7 +51,6 @@ MirrorOS is an AI-powered smart mirror built for the Indian market (Pune-first).
 Frontend  →  Vanilla JS + HTML + CSS (NO React, NO Vue, NO build toolchain)
              Socket.io client (real-time updates)
              Alpine.js only if reactive state is needed (15KB, no npm)
-
 
 Backend   →  Node.js + Express (port 3000)
              Socket.io server (real-time push to UI)
@@ -68,7 +67,6 @@ Integrations → Gmail API (OAuth 2.0, readonly scope)
                WhatsApp via Baileys library (NOT official Business API)
                OpenWeatherMap REST (free tier, 60 calls/min)
                Spotify Web API + Web Player
-               YouTube via Playwright browser automation
 
 OTA       →  GitHub repo + nightly git pull at 2am via cron
 ```
@@ -86,7 +84,7 @@ mirroros/
 │   │   ├── main.js            ← Widget data fetching + clock updates
 │   │   ├── socket.js          ← Socket.io client connection
 │   │   ├── backlight.js       ← LED API calls
-│   │   └── media.js           ← YouTube/Spotify control
+│   │   └── media.js           ← Spotify media control
 │   └── companion/
 │       └── index.html         ← Phone companion app (mobile web)
 ├── server/
@@ -199,7 +197,7 @@ const tools = [
   { name: "get_whatsapp_messages", // → routes/whatsapp.js
   { name: "add_task",              // → POST routes/tasks.js
   { name: "set_backlight",         // → routes/backlight.js → Python LED script
-  { name: "play_media",            // → Playwright YouTube / Spotify API
+  { name: "play_media",            // → Spotify API
   { name: "set_reminder",          // → node-cron timed reminder
   { name: "get_news",              // → NewsAPI or RSS feed
   { name: "morning_briefing"       // → aggregates all APIs → spoken summary

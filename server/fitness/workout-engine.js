@@ -3,6 +3,7 @@ const path = require('path')
 const { calculateCalories, DEFAULT_WEIGHT_KG } = require('./calorie-calculator')
 const exerciseLib = require('./exercise-library')
 const history     = require('./history-tracker')
+const { safeWorkoutPath } = require('../utils/safe-path')
 
 const WORKOUTS_DIR   = path.join(__dirname, '../../data/workouts')
 const WARMUP_SECONDS = 15
@@ -36,13 +37,24 @@ class WorkoutEngine {
       throw new Error('Workout already in progress. Stop current workout first.')
     }
 
-    const filePath = path.join(WORKOUTS_DIR, workoutId + '.json')
+    const filePath = safeWorkoutPath(WORKOUTS_DIR, workoutId)
+    if (!filePath) {
+      throw new Error('Invalid workout id: ' + workoutId)
+    }
     if (!fs.existsSync(filePath)) {
       throw new Error('Workout not found: ' + workoutId)
     }
 
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    this.workoutData = exerciseLib.enrichWorkout(raw)
+    const enriched = exerciseLib.enrichWorkout(raw)
+
+    // A workout with no exercises would make tick() dereference an undefined
+    // entry every second and crash the process. Refuse to start it.
+    if (!enriched || !Array.isArray(enriched.exercises) || enriched.exercises.length === 0) {
+      throw new Error('Workout has no exercises: ' + workoutId)
+    }
+
+    this.workoutData = enriched
     this.workoutId = workoutId
     this.userWeightKg = userWeightKg || DEFAULT_WEIGHT_KG
     this.startedAt = new Date().toISOString()
@@ -65,6 +77,19 @@ class WorkoutEngine {
   }
 
   tick() {
+    try {
+      this._tick()
+    } catch (err) {
+      // A throw here fires every second inside setInterval — never let it
+      // escape and crash the process. Stop the broken workout cleanly.
+      console.error('[workout] tick error — stopping workout:', err.message)
+      this._stopTimer()
+      this._reset()
+      this._emit('fitness:state', this.getState())
+    }
+  }
+
+  _tick() {
     if (this.state === 'warmup') {
       this.warmupRemaining--
       if (this.warmupRemaining <= 0) {
@@ -86,6 +111,11 @@ class WorkoutEngine {
 
       // Accumulate calories for this tick
       const entry = this.workoutData.exercises[this.currentExerciseIndex]
+      if (!entry) {
+        // No exercise at this index — nothing left to run, finish gracefully.
+        this._complete()
+        return
+      }
       const met = entry.metValue || 5.0
       this.caloriesBurned += calculateCalories(met, this.userWeightKg, 1)
 

@@ -1,93 +1,60 @@
 /* ============================================
    MirrorOS — spotify-player.js
-   Spotify Web Playback SDK wrapper
+   Spotify Connect control (no Web Playback SDK)
+
+   Audio plays on the mirror's own librespot/Raspotify Connect device ("Mira").
+   This file no longer creates an in-browser player — it only asks the backend
+   to control that Connect device via the Web API. The now-playing widget polls
+   /api/spotify/now-playing on its own, so no player_state_changed feed is needed.
    ============================================ */
 
-let spotifyPlayer   = null
+let spotifyReady    = false      // is the Mira Connect device online?
 let spotifyDeviceId = null
-let spotifyReady    = false
-
-// Called by Spotify SDK once it loads
-window.onSpotifyWebPlaybackSDKReady = () => {
-  initSpotifyPlayer()
-}
+let _statusTimer    = null
 
 async function initSpotifyPlayer() {
-  // Check if Spotify is connected
-  const status = await fetch('/api/spotify/status').then(r => r.json()).catch(() => ({ connected: false }))
+  const status = await fetch('/api/spotify/status')
+    .then(r => r.json()).catch(() => ({ connected: false }))
+
   if (!status.connected) {
-    console.log('[Spotify] Not connected. Run: npm run setup:spotify')
+    console.log('[Spotify] Not connected. Run setup to link an account.')
     showSpotifyHint()
     return
   }
 
-  if (!window.Spotify) {
-    console.warn('[Spotify] SDK not loaded yet — retrying in 1s')
-    setTimeout(initSpotifyPlayer, 1000)
-    return
-  }
-
-  spotifyPlayer = new Spotify.Player({
-    name: 'MirrorOS — ' + (status.user?.displayName || 'Mirror'),
-    getOAuthToken: async cb => {
-      const r = await fetch('/spotify/token').then(r => r.json()).catch(() => ({ token: null }))
-      cb(r.token || '')
-    },
-    volume: 0.75
-  })
-
-  spotifyPlayer.addListener('ready', ({ device_id }) => {
-    console.log('[Spotify] ✓ Ready as device:', device_id)
-    spotifyDeviceId = device_id
-    spotifyReady    = true
-    hideSpotifyHint()
-    window.dispatchEvent(new CustomEvent('spotify-ready', { detail: { deviceId: device_id } }))
-  })
-
-  spotifyPlayer.addListener('not_ready', ({ device_id }) => {
-    console.warn('[Spotify] Device offline:', device_id)
-    spotifyReady = false
-  })
-
-  spotifyPlayer.addListener('player_state_changed', state => {
-    if (!state) return
-    const track = state.track_window?.current_track
-    if (!track) return
-    const data = {
-      playing:  !state.paused,
-      title:    track.name,
-      artist:   track.artists.map(a => a.name).join(', '),
-      album:    track.album.name,
-      uri:      track.uri,
-      progress: Math.floor(state.position / 1000),
-      duration: Math.floor(state.duration / 1000),
-      coverUrl: track.album.images[0]?.url || null,
-      source:   'spotify'
-    }
-    if (window.musicWidgetInstance) window.musicWidgetInstance.update(data)
-  })
-
-  spotifyPlayer.addListener('initialization_error', ({ message }) =>
-    console.error('[Spotify] Init error:', message))
-  spotifyPlayer.addListener('authentication_error', ({ message }) =>
-    console.error('[Spotify] Auth error:', message))
-  spotifyPlayer.addListener('account_error', ({ message }) =>
-    console.error('[Spotify] Account error (Premium required?):', message))
-
-  await spotifyPlayer.connect()
+  await refreshDeviceStatus()
+  // Re-check the Connect device periodically — librespot may come online a few
+  // seconds after boot, or drop off and return.
+  if (!_statusTimer) _statusTimer = setInterval(refreshDeviceStatus, 15000)
 }
 
-async function spotifyPlayUri(uri) {
-  if (!spotifyDeviceId) {
-    console.warn('[Spotify] No device ID yet — player not ready')
-    return false
+async function refreshDeviceStatus() {
+  try {
+    const data = await fetch('/api/spotify/devices').then(r => r.json())
+    const target = (data.devices || []).find(d => d.isTarget)
+    spotifyReady    = !!target
+    spotifyDeviceId = target ? target.id : null
+    if (spotifyReady) {
+      hideSpotifyHint()
+      window.dispatchEvent(new CustomEvent('spotify-ready', { detail: { deviceId: spotifyDeviceId } }))
+    } else {
+      console.warn('[Spotify] Mira Connect device offline — is Raspotify running?')
+      showSpotifyHint()
+    }
+  } catch (e) {
+    spotifyReady = false
   }
-  await fetch('/api/spotify/play', {
+}
+
+// Play a track/album/playlist on Mira's speaker. Backend resolves the Mira
+// Connect device, so no deviceId is needed here.
+async function spotifyPlayUri(uri) {
+  const res = await fetch('/api/spotify/play', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ uri, deviceId: spotifyDeviceId })
-  })
-  return true
+    body:    JSON.stringify({ uri })
+  }).then(r => r.json()).catch(() => ({}))
+  return !!res.success
 }
 
 async function spotifySearch(query) {
@@ -115,6 +82,9 @@ function hideSpotifyHint() {
   const el = document.getElementById('spotify-hint')
   if (el) el.style.display = 'none'
 }
+
+// Boot immediately — no SDK to wait on.
+initSpotifyPlayer()
 
 window.spotifyPlayUri    = spotifyPlayUri
 window.spotifySearch     = spotifySearch

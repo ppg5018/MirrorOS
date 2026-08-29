@@ -20,7 +20,19 @@ class MusicWidget {
     }
     window.musicWidgetInstance = this
     this._fetchAndUpdate()
-    setInterval(() => this._fetchAndUpdate(), 10000) // Pi: 10s saves 12 Spotify calls/min
+    // Adaptive polling: 10s while a track is playing, 30s when idle. Real-time
+    // 'music-update'/'spotify-play' socket events still refresh instantly, so
+    // the idle back-off is invisible but cuts steady-state Spotify calls ~3x.
+    this._scheduleNextFetch()
+  }
+
+  _scheduleNextFetch() {
+    const playing = !!(this.lastData && this.lastData.playing)
+    const delay = playing ? 10000 : 30000
+    this._pollTimer = setTimeout(async () => {
+      await this._fetchAndUpdate()
+      this._scheduleNextFetch()
+    }, delay)
   }
 
   async _fetchAndUpdate() {
@@ -34,6 +46,11 @@ class MusicWidget {
   update(data) {
     this.lastData = data
     if (!this.el) return
+
+    // Drive the "Nothing playing" placeholder directly off the data so it can
+    // never overlap the now-playing card (don't rely on the style observer).
+    const emptyEl = document.getElementById('now-playing-empty')
+    if (emptyEl) emptyEl.style.display = (data && data.playing) ? 'none' : 'block'
 
     const titleEl  = document.getElementById('music-title')
     const artistEl = document.getElementById('music-artist')
@@ -74,7 +91,7 @@ class MusicWidget {
 
     // Source badge
     if (sourceEl) {
-      sourceEl.textContent = data.source === 'spotify' ? '♫ SPOTIFY' : '▶ YOUTUBE'
+      sourceEl.textContent = '♫ SPOTIFY'
       sourceEl.className   = 'music-source ' + (data.source || 'spotify')
     }
 

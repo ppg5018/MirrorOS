@@ -16,3 +16,17 @@ config/user.json
 config/setup-complete.json
 config/wakeword.json
 config/wifi.json
+config/api-key
+config/reminders.json
+config/alarms.json
+config/imap.json
+config/asx.json
+config/*.bak
+config/_backup_*/
+__pycache__/
+*.pyc
+server/voice/piper-voices/
+*.pre-mira.bak
+.~*
+MirrorOS_Parts_List.xlsx
+data/habits.json

@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 
 // POST /api/media/pause — called by wakeword.py before STT starts
-// Emits 'media-pause' socket event so the browser pauses YouTube/Spotify
+// Emits 'media-pause' socket event so the browser pauses playing media
 router.post('/pause', (req, res) => {
   const io = req.app.get('io')
   io.emit('media-pause')

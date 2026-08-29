@@ -122,10 +122,36 @@ function showMessage(msg) {
   if (el) { el.innerHTML = ''; el.textContent = msg }
 }
 
+// Null-safe textContent setter — the structured lyric slots may be absent.
+function setText(id, val) {
+  const el = document.getElementById(id)
+  if (el) el.textContent = val
+}
+
+// Clear the 5 structured lyric slots without removing the elements.
+function clearStructuredLines() {
+  setText('lyric-past-2', '')
+  setText('lyric-past-1', '')
+  setText('lyric-next-1', '')
+  setText('lyric-next-2', '')
+  const lt = document.getElementById('lyric-text')
+  if (lt) { lt.innerHTML = ''; lt.textContent = '' }
+}
+
 // ── Render unsynced lyrics as static list ─────────────────────
 function renderUnsynced() {
   const container = document.getElementById('lyrics-container')
-  container.innerHTML = ''
+  if (!container) return
+
+  // IMPORTANT: do NOT wipe the container — that would delete #lyric-text and
+  // the #lyric-past-*/#lyric-next-* slots that renderLyrics() and the
+  // mode:karaoke reset depend on, crashing the next song. Instead clear their
+  // text and manage a dedicated #unsynced-list child.
+  clearStructuredLines()
+
+  const existing = document.getElementById('unsynced-list')
+  if (existing) existing.remove()
+
   const list = document.createElement('div')
   list.id = 'unsynced-list'
   lyrics.forEach(line => {
@@ -198,31 +224,39 @@ async function syncLyrics() {
 function renderLyrics(idx) {
   const get = (i) => (lyrics[i] ? lyrics[i].text : '')
 
-  document.getElementById('lyric-past-2').textContent = get(idx - 2)
-  document.getElementById('lyric-past-1').textContent = get(idx - 1)
-  document.getElementById('lyric-next-1').textContent = get(idx + 1)
-  document.getElementById('lyric-next-2').textContent = get(idx + 2)
+  // A synced song may follow an unsynced one — drop its leftover list.
+  const stale = document.getElementById('unsynced-list')
+  if (stale) stale.remove()
+
+  setText('lyric-past-2', get(idx - 2))
+  setText('lyric-past-1', get(idx - 1))
+  setText('lyric-next-1', get(idx + 1))
+  setText('lyric-next-2', get(idx + 2))
 
   // Active line — render as word spans for word-level highlight
   const lyricText = document.getElementById('lyric-text')
-  lyricText.innerHTML = ''
-  if (lyrics[idx]?.words) {
-    lyrics[idx].words.forEach((word, wi) => {
-      const span = document.createElement('span')
-      span.className   = 'word'
-      span.dataset.idx = wi
-      span.textContent = word.text + ' '
-      lyricText.appendChild(span)
-    })
-  } else {
-    lyricText.textContent = get(idx)
+  if (lyricText) {
+    lyricText.innerHTML = ''
+    if (lyrics[idx]?.words) {
+      lyrics[idx].words.forEach((word, wi) => {
+        const span = document.createElement('span')
+        span.className   = 'word'
+        span.dataset.idx = wi
+        span.textContent = word.text + ' '
+        lyricText.appendChild(span)
+      })
+    } else {
+      lyricText.textContent = get(idx)
+    }
   }
 
   // Re-trigger line animation
   const cur = document.getElementById('lyric-current')
-  cur.style.animation = 'none'
-  cur.offsetHeight
-  cur.style.animation = 'glowPulse 3s ease-in-out infinite, lineIn 400ms ease forwards'
+  if (cur) {
+    cur.style.animation = 'none'
+    cur.offsetHeight
+    cur.style.animation = 'glowPulse 3s ease-in-out infinite, lineIn 400ms ease forwards'
+  }
 }
 
 // ── Word-level highlighting within active line ────────────────
@@ -261,6 +295,10 @@ function initVisualizer() {
 }
 
 function drawVisualizer() {
+  // Keep the rAF loop alive but do no drawing while the page is hidden
+  // (screensaver / backgrounded) — saves a CPU core on the Pi for free.
+  if (document.hidden) { requestAnimationFrame(drawVisualizer); return }
+
   const ctx = vizCtx
   const W   = vizCanvas.width
   const H   = vizCanvas.height
@@ -386,12 +424,15 @@ function connectSocket() {
     syncOffset    = 0
     beatPulse     = 0
 
-    document.getElementById('lyric-past-2').textContent = ''
-    document.getElementById('lyric-past-1').textContent = ''
+    const staleList = document.getElementById('unsynced-list')
+    if (staleList) staleList.remove()
+    setText('lyric-past-2', '')
+    setText('lyric-past-1', '')
     const lt = document.getElementById('lyric-text'); if (lt) { lt.innerHTML = ''; lt.textContent = '...' }
-    document.getElementById('lyric-next-1').textContent = ''
-    document.getElementById('lyric-next-2').textContent = ''
-    document.getElementById('progress-fill').style.width = '0%'
+    setText('lyric-next-1', '')
+    setText('lyric-next-2', '')
+    const pf = document.getElementById('progress-fill')
+    if (pf) pf.style.width = '0%'
 
     if (data?.track) {
       const { id, name, artist, album, album_art, duration_ms } = data.track

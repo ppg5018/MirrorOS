@@ -15,6 +15,18 @@ window.addEventListener('resize', function () {
 // Flag: true while a direct text query is in flight (prevents socket double-animation)
 let _queryInFlight = false
 
+// Escape untrusted text before it goes into innerHTML. Message subjects,
+// senders, event titles etc. are attacker-controllable and must never be
+// interpreted as HTML.
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 /* ─── Figma-exact inline SVG icons ─── */
 const SVG_ICONS = {
   // Notification icons
@@ -46,17 +58,33 @@ const TOOL_TO_WIDGET = {
   get_weather: 'weather',
   get_calendar_events: 'calendar',
   get_whatsapp_messages: 'notifications',
+  get_tasks: 'tasks',
   add_task: 'tasks',
+  complete_task: 'tasks',
+  delete_task: 'tasks',
   set_backlight: 'backlight',
   morning_briefing: 'all',
   get_news: 'ai-bar',
   set_reminder: 'ai-bar',
   play_music: 'music',
-  get_quote:  'quote'
+  get_quote:  'quote',
+  manage_habits: 'habits',
+  alarm_control: 'alarm',
+  fitness_control: 'fitness'
 }
 
 // ── Typewriter animation ────────────────────
 function typewriter(el, text, speed = 28) {
+  if (!el) return
+  text = String(text == null ? '' : text)
+
+  // Cancel any animation still running on this element. Without this, an
+  // overlapping call wipes the element (removing the old cursor) while the old
+  // interval keeps calling insertBefore(node, oldCursor) \u2014 which throws every
+  // tick forever because oldCursor is no longer a child.
+  if (el._twTimer)    { clearInterval(el._twTimer); el._twTimer = null }
+  if (el._twEndTimer) { clearTimeout(el._twEndTimer); el._twEndTimer = null }
+
   el.textContent = ''
   let i = 0
   const cursor = document.createElement('span')
@@ -64,12 +92,18 @@ function typewriter(el, text, speed = 28) {
   cursor.textContent = '|'
   el.appendChild(cursor)
 
-  const timer = setInterval(() => {
+  el._twTimer = setInterval(() => {
+    // If the cursor was detached (element reused elsewhere), stop cleanly.
+    if (cursor.parentNode !== el) {
+      clearInterval(el._twTimer); el._twTimer = null
+      return
+    }
     el.insertBefore(document.createTextNode(text[i++]), cursor)
     if (i >= text.length) {
-      clearInterval(timer)
-      setTimeout(() => {
-        cursor.remove()
+      clearInterval(el._twTimer); el._twTimer = null
+      el._twEndTimer = setTimeout(() => {
+        el._twEndTimer = null
+        if (cursor.parentNode === el) cursor.remove()
         setState('idle')
         el.textContent = 'Say \u201cHey Mirror\u201d to begin.'
       }, 7000)
@@ -77,27 +111,68 @@ function typewriter(el, text, speed = 28) {
   }, speed)
 }
 
-// ── Clock ──────────────────────────────────
+// ── Clock (12-hour, Mira style) ─────────────
 function updateClock() {
   const now = new Date()
-  const h = String(now.getHours()).padStart(2, '0')
+  const rawH = now.getHours()
+  let h12 = rawH % 12
+  if (h12 === 0) h12 = 12
   const m = String(now.getMinutes()).padStart(2, '0')
+  const ampm = rawH < 12 ? 'AM' : 'PM'
 
   const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
   const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
     'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
 
-  document.getElementById('clock-h').textContent = h
-  document.getElementById('clock-m').textContent = m
+  const hEl = document.getElementById('clock-h')
+  const mEl = document.getElementById('clock-m')
+  const apEl = document.getElementById('clock-ampm')
+  if (hEl) hEl.textContent = String(h12)
+  if (mEl) mEl.textContent = m
+  if (apEl) apEl.textContent = ampm
 
-  document.getElementById('clock-date').textContent =
-    days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()]
+  const dateEl = document.getElementById('clock-date')
+  if (dateEl) dateEl.textContent =
+    days[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate()
 }
 
 updateClock()
 setInterval(updateClock, 5000) // Pi: 5s is fine — we only display HH:MM
 
+// ── Greeting (time-of-day + owner name) ─────
+// fetchGmail() supplies the real Google account name; until then we keep
+// whatever name is already in the markup and just fix the time-of-day prefix.
+let _ownerName = null
+function updateGreeting() {
+  const el = document.querySelector('.ai-card-greeting')
+  if (!el) return
+  const hour = new Date().getHours()
+  const tod = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  if (!_ownerName) {
+    const m = (el.textContent || '').match(/,\s*(.+)$/)
+    if (m) _ownerName = m[1].trim()
+  }
+  el.textContent = _ownerName ? `${tod}, ${_ownerName}` : tod
+}
+updateGreeting()
+setInterval(updateGreeting, 60 * 1000)
+
 // ── Weather ────────────────────────────────
+// Map an OpenWeather condition string → a Material Symbols Rounded glyph name.
+function weatherSymbol(cond) {
+  const c = String(cond || '').toLowerCase()
+  if (c.includes('thunder')) return 'thunderstorm'
+  if (c.includes('drizzle')) return 'rainy'
+  if (c.includes('rain'))    return 'rainy'
+  if (c.includes('snow'))    return 'weather_snowy'
+  if (c.includes('mist') || c.includes('fog') || c.includes('haze') ||
+      c.includes('smoke') || c.includes('dust')) return 'foggy'
+  if (c.includes('partly') || c.includes('few') || c.includes('scatter')) return 'partly_cloudy_day'
+  if (c.includes('cloud') || c.includes('overcast')) return 'cloud'
+  if (c.includes('clear') || c.includes('sun')) return 'clear_day'
+  return 'partly_cloudy_day'
+}
+
 async function fetchWeather() {
   try {
     const res = await fetch('/api/weather')
@@ -108,48 +183,33 @@ async function fetchWeather() {
     const iconEl = document.querySelector('.weather-icon')
 
     if (tempEl) tempEl.textContent = data.temp + '°'
-    if (condEl) condEl.textContent = data.city + ' · ' + data.condition
-    if (iconEl && typeof getWeatherIcon === 'function') {
-      iconEl.innerHTML = getWeatherIcon(data.weatherMain || data.condition, 52)
+    if (condEl) {
+      // Match the design: "Clear · feels 16°"
+      condEl.textContent = (data.feelsLike != null)
+        ? data.condition + ' · feels ' + data.feelsLike + '°'
+        : data.city + ' · ' + data.condition
     }
+    if (iconEl) iconEl.textContent = weatherSymbol(data.weatherMain || data.condition)
 
-    // Forecast — slot 0 = TODAY (current conditions), slots 1-3 = API forecast days
-    const forecastDays = document.querySelectorAll('.forecast-day')
-    if (forecastDays.length) {
-      const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-      const today = new Date()
+    // Hi / lo
+    const hiEl = document.getElementById('wx-high')
+    const loEl = document.getElementById('wx-low')
+    if (hiEl && data.high != null) hiEl.textContent = data.high
+    if (loEl && data.low  != null) loEl.textContent = data.low
 
-      // Slot 0: today's current weather
-      const todayNameEl = forecastDays[0] ? forecastDays[0].querySelector('.day-name') : null
-      const todayHiEl   = forecastDays[0] ? forecastDays[0].querySelector('.day-temp-hi') : null
-      const todayIconEl = document.getElementById('forecast-icon-0')
-      if (todayNameEl) todayNameEl.textContent = days[today.getDay()]
-      if (todayHiEl)   todayHiEl.textContent   = data.temp + '°'
-      if (todayIconEl && typeof getWeatherIcon === 'function') {
-        todayIconEl.innerHTML = getWeatherIcon(data.weatherMain || data.condition, 18)
-      }
-
-      // Slots 1-3: next 3 forecast days
-      if (data.forecast) {
-        data.forecast.slice(0, 3).forEach((f, i) => {
-          const slot = forecastDays[i + 1]
-          if (!slot) return
-          const nameEl        = slot.querySelector('.day-name')
-          const hiEl          = slot.querySelector('.day-temp-hi')
-          const forecastIconEl = document.getElementById('forecast-icon-' + (i + 1))
-          if (nameEl) nameEl.textContent = f.day
-          if (hiEl)   hiEl.textContent   = f.temp + '°'
-          if (forecastIconEl && typeof getWeatherIcon === 'function') {
-            forecastIconEl.innerHTML = getWeatherIcon(f.condition || data.weatherMain || data.condition, 18)
-          }
-        })
-      }
-    }
-
-    // Humidity tag
-    if (data.humidity) {
-      const humidityTag = document.querySelector('.weather-tag .tag-text')
-      if (humidityTag) humidityTag.textContent = data.humidity + '% Humidity'
+    // Forecast strip — prefer the hourly strip (design), fall back to daily forecast
+    const fc = document.getElementById('weather-forecast')
+    const strip = Array.isArray(data.hourly) && data.hourly.length
+      ? data.hourly.map(f => ({ label: f.label, temp: f.temp, condition: f.condition }))
+      : (Array.isArray(data.forecast) ? data.forecast.map(f => ({ label: f.day, temp: f.temp, condition: f.condition })) : [])
+    if (fc && strip.length) {
+      fc.innerHTML = strip.map(f => `
+        <div class="wx-hour">
+          <div class="wx-h-label">${escapeHtml(f.label || '')}</div>
+          <span class="msr">${weatherSymbol(f.condition)}</span>
+          <div class="wx-h-temp">${f.temp}°</div>
+        </div>
+      `).join('')
     }
   } catch (err) {
     console.error('[main] fetchWeather error:', err)
@@ -157,9 +217,9 @@ async function fetchWeather() {
 }
 
 // ── Calendar ───────────────────────────────
-async function fetchCalendar() {
+async function fetchCalendar(fresh) {
   try {
-    const res = await fetch('/api/calendar')
+    const res = await fetch('/api/calendar' + (fresh ? '?fresh=1' : ''))
     const data = await res.json()
 
     const container = document.querySelector('.schedule-widget')
@@ -192,27 +252,25 @@ async function fetchCalendar() {
 
       const stateClass = event.current ? ' active' : (isPast ? ' past' : '')
 
-      const isLast = (i === data.events.length - 1)
+      // Mira-style colored chip, cycling accent colors
+      const palette = [
+        { color: '#f4b183', bg: 'rgba(244,177,131,.15)', icon: 'groups' },
+        { color: '#8ec5ff', bg: 'rgba(142,197,255,.15)', icon: 'draw' },
+        { color: '#b8f0c8', bg: 'rgba(184,240,200,.15)', icon: 'restaurant' }
+      ]
+      const p = palette[i % palette.length]
 
       const row = document.createElement('div')
       row.className = 'schedule-event' + stateClass
       row.dataset.index = String(i)
 
-      const dotClass = event.current ? 'active' : (isPast ? 'done' : 'inactive')
-      const lineClass = event.current ? 'event-line active-line' : 'event-line'
-
       row.innerHTML = `
-        <div class="event-time-block">
-          <span class="event-time-h">${displayH}:${rawM}</span>
-          <span class="event-time-ampm">${ampm}</span>
-        </div>
-        <div class="event-dot-col">
-          <div class="event-dot ${dotClass}"></div>
-          ${!isLast ? `<div class="${lineClass}"></div>` : ''}
-        </div>
-        <div class="event-details">
-          <span class="event-name${event.current ? ' active' : ''}">${event.title}${event.current ? '<span class="event-now-tag">Now</span>' : ''}</span>
-          <span class="event-location${event.current ? ' active' : ''}">${event.location || ''}</span>
+        <span class="sched-chip" style="color:${p.color};background:${p.bg};">
+          <span class="msr">${p.icon}</span>
+        </span>
+        <div class="sched-body">
+          <span class="event-name">${escapeHtml(event.title)}${event.current ? '<span class="event-now-tag">Now</span>' : ''}</span>
+          <span class="event-location">${displayH}:${rawM} ${ampm}${event.location ? ' · ' + escapeHtml(event.location) : ''}</span>
         </div>
       `
       container.appendChild(row)
@@ -251,7 +309,62 @@ function renderTasks(tasks) {
     item.innerHTML = `
       <span class="task-priority ${task.priority || 'low'}"></span>
       <span class="task-check">${task.done ? SVG_ICONS.check : ''}</span>
-      <span class="task-text">${task.text}</span>
+      <span class="task-icon msr">${reminderIcon(task.text)}</span>
+      <span class="task-text">${escapeHtml(task.text)}</span>
+    `
+    list.appendChild(item)
+  })
+}
+
+// Pick a small muted glyph for a reminder, matching the design's iconography.
+function reminderIcon(text) {
+  const t = String(text || '').toLowerCase()
+  if (/(meditat|stretch|yoga|breath|mindful)/.test(t)) return 'self_improvement'
+  if (/(walk|leave|go |commute|run |jog|gym|workout)/.test(t)) return 'directions_walk'
+  if (/(water|plant|flower|garden)/.test(t)) return 'local_florist'
+  if (/(call|phone|ring)/.test(t)) return 'call'
+  if (/(buy|shop|grocery|groceries|pick up|order)/.test(t)) return 'shopping_cart'
+  if (/(email|mail|reply|send)/.test(t)) return 'mail'
+  if (/(pay|bill|rent|invoice)/.test(t)) return 'payments'
+  if (/(read|book|study)/.test(t)) return 'menu_book'
+  return 'radio_button_unchecked'
+}
+
+// ── Habits render ───────────────────────────
+// Accepts the /api/habits view: { habits:[{name,doneToday,streak,week[]}], doneToday, total }
+function renderHabits(data) {
+  const list = document.getElementById('habits-list')
+  if (!list) return
+
+  const habits = (data && data.habits) || []
+  const done   = (data && typeof data.doneToday === 'number') ? data.doneToday : habits.filter(h => h.doneToday).length
+  const total  = (data && typeof data.total === 'number') ? data.total : habits.length
+
+  const counterEl = document.getElementById('habits-done-counter')
+  if (counterEl) counterEl.textContent = total > 0 ? `${done}/${total} done` : ''
+
+  const progressEl = document.getElementById('habits-progress-fill')
+  if (progressEl) progressEl.style.width = total > 0 ? (done / total * 100) + '%' : '0%'
+
+  list.innerHTML = ''
+
+  if (total === 0) {
+    list.innerHTML = '<div class="habit-item" style="color:var(--dimmer)">No habits yet</div>'
+    return
+  }
+
+  habits.forEach(habit => {
+    const week = Array.isArray(habit.week) ? habit.week : []
+    const dots = week.map(on => `<span class="habit-dot ${on ? 'on' : ''}"></span>`).join('')
+    const streak = habit.streak || 0
+
+    const item = document.createElement('div')
+    item.className = 'habit-item' + (habit.doneToday ? ' done' : '')
+    item.innerHTML = `
+      <span class="habit-check">${SVG_ICONS.check}</span>
+      <span class="habit-name">${escapeHtml(habit.name)}</span>
+      <span class="habit-week">${dots}</span>
+      <span class="habit-streak ${streak > 0 ? '' : 'zero'}">${streak > 0 ? streak + 'd' : '—'}</span>
     `
     list.appendChild(item)
   })
@@ -332,7 +445,9 @@ async function sendTextQuery(text) {
         if (widget) {
           highlightWidget(widget)
           if (widget === 'tasks') fetchTasks()
-          if (widget === 'calendar') fetchCalendar()
+          if (widget === 'habits') fetchHabits()
+          if (widget === 'alarm' && typeof fetchAlarms === 'function') fetchAlarms()
+          if (widget === 'calendar') fetchCalendar(true)
         }
       }
     } else if (data.error) {
@@ -443,6 +558,18 @@ function _notifTimeLabel(dateVal) {
   return Math.floor(diffH / 24) + 'd'
 }
 
+// Keep the header badge (#notif-count) in sync with the number of live items.
+function _updateNotifCount(widget) {
+  const w = widget || document.getElementById('widget-notifications')
+  if (!w) return
+  const n = w.querySelectorAll('.notif-item:not(.notif-empty)').length
+  const badge = document.getElementById('notif-count')
+  if (badge) {
+    badge.textContent = n > 0 ? String(n) : ''
+    badge.style.display = n > 0 ? '' : 'none'
+  }
+}
+
 // ── Gmail / Notifications ───────────────────
 async function fetchGmail() {
   try {
@@ -451,6 +578,7 @@ async function fetchGmail() {
 
     // Update ALL greeting elements with real Google account name
     if (data.name) {
+      _ownerName = data.name
       const hour = new Date().getHours()
       const tod  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
       const text = `${tod}, ${data.name}`
@@ -471,37 +599,44 @@ async function fetchGmail() {
     widget.querySelectorAll('.notif-item').forEach(el => el.remove())
     widget.querySelectorAll('.notif-auth-warn').forEach(el => el.remove())
 
-    // Show auth warning if Google token expired
-    if (data.mock && data.error) {
+    // Warn ONLY when email is actually set up but currently failing — never
+    // when it's simply not configured (that's a normal, quiet state).
+    if (data.configured && data.error) {
       const warn = document.createElement('div')
       warn.className = 'notif-auth-warn'
       warn.style.cssText = 'font-size:10px;color:rgba(255,100,100,0.7);padding:4px 0 8px;font-family:var(--font-mono)'
-      warn.textContent = '⚠ Google auth expired — reconnect from companion app'
+      warn.textContent = '⚠ Email sync failed — recheck it in setup'
       widget.appendChild(warn)
       return
     }
 
     data.previews.forEach(p => {
       const timeLabel = _notifTimeLabel(p.date)
-      const isUnread  = p.unread !== false
       const item = document.createElement('div')
       item.className = 'notif-item'
       item.innerHTML = `
-        <div class="notif-icon email">${SVG_ICONS.gmail}</div>
+        <div class="notif-icon" style="color:#f4b183;background:rgba(244,177,131,.15)"><span class="msr">mail</span></div>
         <div class="notif-content">
-          <div class="notif-sender">${p.sender}</div>
-          <div class="notif-message">${p.subject}</div>
+          <div class="notif-sender">${escapeHtml(p.sender)}</div>
+          <div class="notif-message">${escapeHtml(p.subject)}</div>
         </div>
-        ${timeLabel ? `<span class="notif-time">${timeLabel}</span>` : `<span class="notif-meta">${isUnread ? '<span class="notif-badge-new"></span>' : ''}</span>`}
+        ${timeLabel ? `<span class="notif-time">${escapeHtml(timeLabel)}</span>` : ''}
+        <button class="notif-dismiss" aria-label="Dismiss">×</button>
       `
+      item.querySelector('.notif-dismiss').addEventListener('click', () => {
+        item.remove()
+        _updateNotifCount(widget)
+      })
       widget.appendChild(item)
     })
 
+    _updateNotifCount(widget)
+
     if (data.previews.length === 0) {
       const empty = document.createElement('div')
-      empty.className = 'notif-item'
+      empty.className = 'notif-item notif-empty'
       empty.style.color = 'var(--dimmer)'
-      empty.textContent = 'No unread emails'
+      empty.textContent = "You're all caught up."
       widget.appendChild(empty)
     }
   } catch (err) {
@@ -517,6 +652,17 @@ async function fetchTasks() {
     if (data.tasks) renderTasks(data.tasks)
   } catch (err) {
     console.error('[main] fetchTasks error:', err)
+  }
+}
+
+// ── Habits fetch ────────────────────────────
+async function fetchHabits() {
+  try {
+    const res = await fetch('/api/habits')
+    const data = await res.json()
+    renderHabits(data)
+  } catch (err) {
+    console.error('[main] fetchHabits error:', err)
   }
 }
 
@@ -580,15 +726,143 @@ if (typeof socket !== 'undefined') {
   })
 }
 
-// ── News Ticker ────────────────────────────
-const ticker = new NewsTicker()
-ticker.init()
+// ── News list (Mira card) ──────────────────
+let _newsHeadlines = []
+let _newsIdx = 0
+let _newsTimer = null
+
+function renderNews() {
+  const list = document.getElementById('news-list')
+  if (!list) return
+  if (_newsHeadlines.length === 0) {
+    list.innerHTML = '<div class="news-item"><span class="news-text" style="color:var(--dimmer)">No headlines</span></div>'
+    return
+  }
+  list.innerHTML = _newsHeadlines.slice(0, 4).map((h, i) => `
+    <div class="news-item${i === _newsIdx ? ' active' : ''}">
+      <span class="news-dot"></span>
+      <span class="news-text">${escapeHtml(h.title || h)}</span>
+    </div>
+  `).join('')
+}
 
 function fetchNews() {
   fetch('/api/news')
     .then(r => r.json())
-    .then(data => ticker.load(data.headlines))
+    .then(data => {
+      _newsHeadlines = (data && data.headlines) || []
+      _newsIdx = 0
+      renderNews()
+      if (_newsTimer) clearInterval(_newsTimer)
+      const n = Math.min(4, _newsHeadlines.length)
+      if (n > 1) {
+        _newsTimer = setInterval(() => {
+          _newsIdx = (_newsIdx + 1) % n
+          renderNews()
+        }, 5000)
+      }
+    })
     .catch(() => { })
+}
+
+// ── Photo Gallery (Mira carousel) ──────────
+let _galleryPhotos = []
+let _galleryIdx = 0
+let _galleryTimer = null
+
+function renderGallery() {
+  const frame = document.getElementById('gallery-frame')
+  const dots  = document.getElementById('gallery-dots')
+  if (!frame) return
+
+  // Rebuild only slides (keep the scrim)
+  frame.querySelectorAll('.gallery-slide, .gallery-empty').forEach(el => el.remove())
+
+  if (_galleryPhotos.length === 0) {
+    const empty = document.createElement('div')
+    empty.className = 'gallery-empty'
+    empty.innerHTML = '<span class="msr">add_photo_alternate</span><span>Add photos from the companion app</span>'
+    frame.insertBefore(empty, frame.firstChild)
+    if (dots) dots.innerHTML = ''
+    return
+  }
+
+  _galleryPhotos.forEach((p, i) => {
+    const slide = document.createElement('div')
+    slide.className = 'gallery-slide' + (i === _galleryIdx ? ' active' : '')
+    slide.style.backgroundImage = `url("${p.url}")`
+    frame.insertBefore(slide, frame.firstChild)
+  })
+
+  if (dots) {
+    dots.innerHTML = ''
+    _galleryPhotos.forEach((_, i) => {
+      const d = document.createElement('span')
+      d.className = 'gallery-dot' + (i === _galleryIdx ? ' active' : '')
+      d.addEventListener('click', () => { _galleryIdx = i; renderGallery(); _scheduleGallery() })
+      dots.appendChild(d)
+    })
+  }
+}
+
+function _scheduleGallery() {
+  if (_galleryTimer) clearInterval(_galleryTimer)
+  if (_galleryPhotos.length > 1) {
+    _galleryTimer = setInterval(() => {
+      _galleryIdx = (_galleryIdx + 1) % _galleryPhotos.length
+      renderGallery()
+    }, 6000)
+  }
+}
+
+function fetchGallery() {
+  fetch('/api/photos')
+    .then(r => r.json())
+    .then(data => {
+      _galleryPhotos = (data && data.photos) || []
+      _galleryIdx = 0
+      renderGallery()
+      _scheduleGallery()
+    })
+    .catch(() => {})
+}
+
+// ── Ask Mira orb ───────────────────────────
+function initOrb() {
+  const wrap  = document.getElementById('widget-ai-bar')
+  const btn   = document.getElementById('orb-btn')
+  const input = document.getElementById('orb-input')
+  const send  = document.getElementById('orb-send')
+  if (!wrap || !btn) return
+
+  const openOrb  = () => { wrap.classList.add('open'); if (input) setTimeout(() => input.focus(), 60) }
+  const closeOrb = () => wrap.classList.remove('open')
+  const toggle   = () => wrap.classList.contains('open') ? closeOrb() : openOrb()
+
+  btn.addEventListener('click', toggle)
+
+  const submit = () => {
+    if (!input) return
+    const q = input.value.trim()
+    if (!q) return
+    input.value = ''
+    openOrb()
+    sendTextQuery(q)
+  }
+  if (send)  send.addEventListener('click', submit)
+  if (input) input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submit()
+    if (e.key === 'Escape') closeOrb()
+  })
+
+  // Auto-open the panel whenever Mira is listening or responding so the
+  // reply/voice status is visible even if the user didn't tap the orb.
+  const body = document.body
+  new MutationObserver(() => {
+    if (body.classList.contains('state-listening') || body.classList.contains('state-responding')) {
+      openOrb()
+    }
+  }).observe(body, { attributes: true, attributeFilter: ['class'] })
 }
 
 // ── Daily Quote ────────────────────────────
@@ -634,12 +908,57 @@ if (typeof socket !== 'undefined') {
 }
 
 // ── Media command bridge (HTML onclick → Spotify) ────
+// Map dashboard buttons onto the actions /api/spotify/control accepts:
+// pause | resume | next | prev. 'toggle' becomes pause/resume based on the
+// widget's current playing state; 'prev' must be 'prev' (not 'previous').
 function mediaCommand(action) {
-  if (typeof spotifyControl === 'function') {
-    if (action === 'toggle') spotifyControl('toggle')
-    else if (action === 'prev') spotifyControl('previous')
-    else if (action === 'next') spotifyControl('next')
+  if (typeof spotifyControl !== 'function') return
+  if (action === 'next') return spotifyControl('next')
+  if (action === 'prev') return spotifyControl('prev')
+  if (action === 'toggle') {
+    const playing = !!(window.musicWidgetInstance &&
+      window.musicWidgetInstance.lastData &&
+      window.musicWidgetInstance.lastData.playing)
+    return spotifyControl(playing ? 'pause' : 'resume')
   }
+}
+
+// ── Voice-driven display controls ───────────
+// Screen "brightness" is a dimming overlay (a mirror can only get darker).
+let _screenBrightness = 100
+function _ensureDimEl() {
+  let el = document.getElementById('screen-dim')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'screen-dim'
+    el.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;' +
+      'pointer-events:none;z-index:90000;transition:opacity 0.4s ease;'
+    document.body.appendChild(el)
+  }
+  return el
+}
+function applyScreenBrightness(level) {
+  _screenBrightness = Math.min(100, Math.max(10, level))
+  _ensureDimEl().style.opacity = String((100 - _screenBrightness) / 100)
+}
+
+if (typeof socket !== 'undefined') {
+  // Highlight any panel (voice: "highlight the calendar")
+  socket.on('widget-highlight', ({ widget }) => {
+    if (typeof highlightWidget === 'function') highlightWidget(widget)
+  })
+
+  // Clear ambient-art wallpaper (voice: "clear the wallpaper")
+  socket.on('wallpaper-control', ({ action }) => {
+    if (action === 'clear' && typeof clearWallpaper === 'function') clearWallpaper()
+  })
+
+  // Screen brightness (voice: "dim the screen" / "brightness 50")
+  socket.on('display-brightness', ({ action, level }) => {
+    if (action === 'set' && typeof level === 'number') applyScreenBrightness(level)
+    else if (action === 'dim')      applyScreenBrightness(_screenBrightness - 20)
+    else if (action === 'brighten') applyScreenBrightness(_screenBrightness + 20)
+  })
 }
 
 // ── Boot ───────────────────────────────────
@@ -651,7 +970,8 @@ async function fetchAll() {
     fetchAuthStatus(),
     fetchTasks(),
     fetchGmail(),
-    fetchQuote()
+    fetchQuote(),
+    fetchGallery()
   ])
 }
 
@@ -798,19 +1118,25 @@ if (typeof socket !== 'undefined') {
     const item = document.createElement('div')
     item.className = 'notif-item notif-new'
     item.innerHTML = `
-      <div class="notif-icon">${SVG_ICONS.whatsapp}</div>
+      <div class="notif-icon" style="color:#8ec5ff;background:rgba(142,197,255,.15)"><span class="msr">chat</span></div>
       <div class="notif-content">
-        <div class="notif-sender">${data.from}</div>
-        <div class="notif-message">${data.text}</div>
+        <div class="notif-sender">${escapeHtml(data.from)}</div>
+        <div class="notif-message">${escapeHtml(data.text)}</div>
       </div>
       <span class="notif-time">now</span>
+      <button class="notif-dismiss" aria-label="Dismiss">×</button>
     `
+    item.querySelector('.notif-dismiss').addEventListener('click', () => {
+      item.remove()
+      if (typeof _updateNotifCount === 'function') _updateNotifCount(notifList)
+    })
     const firstItem = notifList.querySelector('.notif-item')
     if (firstItem) notifList.insertBefore(item, firstItem)
     else notifList.appendChild(item)
 
     const items = notifList.querySelectorAll('.notif-item')
     if (items.length > 5) items[items.length - 1].remove()
+    if (typeof _updateNotifCount === 'function') _updateNotifCount(notifList)
 
     notifList.classList.add('widget-highlight')
     setTimeout(() => notifList.classList.remove('widget-highlight'), 1000)
@@ -869,7 +1195,7 @@ function showSetupScreen(setupURL) {
       overlay.innerHTML = `
         <div style="text-align:center">
           <div style="width:80px;height:80px;border-radius:50%;background:rgba(78,205,196,0.15);border:2px solid #4ecdc4;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px;color:#4ecdc4">✓</div>
-          <h2 style="color:white;font-size:28px;font-weight:200;margin:0 0 8px">Welcome, ${data.name || 'to Mira'}!</h2>
+          <h2 style="color:white;font-size:28px;font-weight:200;margin:0 0 8px">Welcome, ${escapeHtml(data.name || 'to Mira')}!</h2>
           <p style="color:rgba(255,255,255,0.4);margin:0">Loading your dashboard...</p>
         </div>
       `
@@ -884,7 +1210,11 @@ fetchNews()
 setInterval(fetchAll, 5 * 60 * 1000)
 setInterval(fetchNews, 15 * 60 * 1000)
 
-initTestInput()
-initWallpaper()
+initOrb()
+
+// Refresh the gallery when photos change (companion app upload)
+if (typeof socket !== 'undefined') {
+  socket.on('photos-updated', () => fetchGallery())
+}
 
 if (window.screensaver) window.screensaver.init()

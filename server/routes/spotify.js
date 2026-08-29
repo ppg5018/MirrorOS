@@ -1,6 +1,7 @@
 const express = require('express')
 const router  = express.Router()
 const { getValidToken, isConnected, getUserInfo } = require('../helpers/spotify-auth')
+const BoundedCache = require('../utils/bounded-cache')
 
 const API = 'https://api.spotify.com/v1'
 
@@ -28,6 +29,50 @@ async function spotify(method, endpoint, body = null) {
   return res.json()
 }
 
+// ── Connect device targeting ──────────────────────────────────
+// Audio comes out of Mira's own speaker via a librespot/Raspotify Connect
+// device running on the Pi. The Web API only *controls* it, so we resolve that
+// device's id by name and target it on play/control. Name precedence:
+//   env SPOTIFY_DEVICE_NAME → config/spotify-device.json {name} → 'Mira'
+function targetDeviceName() {
+  if (process.env.SPOTIFY_DEVICE_NAME) return process.env.SPOTIFY_DEVICE_NAME
+  try {
+    const fs   = require('fs')
+    const path = require('path')
+    const cfg  = JSON.parse(fs.readFileSync(path.join(__dirname, '../../config/spotify-device.json'), 'utf8'))
+    if (cfg.name) return cfg.name
+  } catch (e) { /* fall through */ }
+  return 'Mira'
+}
+
+let _deviceCache = { id: null, at: 0 }
+const DEVICE_TTL = 30 * 1000
+
+async function listDevices() {
+  const data = await spotify('GET', '/me/player/devices')
+  return data?.devices || []
+}
+
+// Pick the device to target. Preference: the Mira Connect device (librespot on
+// the Pi) → whatever device is currently active → the first available device.
+// Cached 30s. Returns null only when no Spotify device is available at all.
+async function resolveDeviceId() {
+  if (_deviceCache.id && Date.now() - _deviceCache.at < DEVICE_TTL) return _deviceCache.id
+  try {
+    const wanted  = targetDeviceName().toLowerCase()
+    const devices = await listDevices()
+    if (!devices.length) return null
+    const mira   = devices.find(d => (d.name || '').toLowerCase() === wanted)
+             || devices.find(d => (d.name || '').toLowerCase().includes(wanted))
+    const active = devices.find(d => d.is_active)
+    const pick   = mira || active || devices[0]
+    if (pick) { _deviceCache = { id: pick.id, at: Date.now() }; return pick.id }
+  } catch (e) {
+    console.error('[Spotify] device resolve failed:', e.message)
+  }
+  return null
+}
+
 // Wrap routes in try/catch — returns 503 on any failure
 function safe(fn) {
   return async (req, res) => {
@@ -48,7 +93,7 @@ router.get('/auth', (req, res) => {
 
   const redirectURI = `${getMirrorBaseURL()}/api/spotify/callback`
   const scopes = [
-    'streaming', 'user-read-email', 'user-read-private',
+    'user-read-email', 'user-read-private',
     'user-read-playback-state', 'user-modify-playback-state',
     'user-read-currently-playing', 'playlist-read-private',
     'playlist-read-collaborative', 'user-library-read',
@@ -136,15 +181,15 @@ router.get('/status', (req, res) => {
 })
 
 // ── GET /api/spotify/search?q= ────────────────────────────────
-const searchCache = {}
+// Bounded: 50 most-recent queries, 30-min TTL.
+const searchCache = new BoundedCache({ max: 50, ttl: 30 * 60 * 1000 })
 router.get('/search', safe(async (req, res) => {
   const q = (req.query.q || '').trim()
   if (!q) return res.json([])
 
   const key = q.toLowerCase()
-  if (searchCache[key] && Date.now() - searchCache[key].t < 1800000) {
-    return res.json(searchCache[key].data)
-  }
+  const cached = searchCache.get(key)
+  if (cached) return res.json(cached)
 
   const data = await spotify('GET',
     '/search?q=' + encodeURIComponent(q) +
@@ -161,7 +206,7 @@ router.get('/search', safe(async (req, res) => {
     previewUrl: item.preview_url
   }))
 
-  searchCache[key] = { data: results, t: Date.now() }
+  searchCache.set(key, results)
   res.json(results)
 }))
 
@@ -182,10 +227,26 @@ router.get('/now-playing', safe(async (req, res) => {
   })
 }))
 
+// ── GET /api/spotify/devices ──────────────────────────────────
+// Lists available Connect devices and flags the one Mira targets.
+router.get('/devices', safe(async (req, res) => {
+  const devices = await listDevices()
+  const wanted  = targetDeviceName().toLowerCase()
+  res.json({
+    target: targetDeviceName(),
+    devices: devices.map(d => ({
+      id: d.id, name: d.name, type: d.type, active: d.is_active,
+      isTarget: (d.name || '').toLowerCase().includes(wanted)
+    }))
+  })
+}))
+
 // ── POST /api/spotify/play ────────────────────────────────────
-// Body: { uri, deviceId }
+// Body: { uri, deviceId? } — defaults to the Mira Connect device so audio
+// plays on the mirror's own speaker.
 router.post('/play', safe(async (req, res) => {
-  const { uri, deviceId } = req.body
+  const { uri } = req.body
+  const deviceId = req.body.deviceId || await resolveDeviceId()
   const body = uri
     ? (uri.includes('playlist') || uri.includes('album')
         ? { context_uri: uri }
@@ -193,26 +254,31 @@ router.post('/play', safe(async (req, res) => {
     : {}
   const endpoint = '/me/player/play' + (deviceId ? '?device_id=' + deviceId : '')
   await spotify('PUT', endpoint, body)
-  res.json({ success: true })
+  res.json({ success: true, deviceId: deviceId || null })
 }))
 
 // ── POST /api/spotify/control ─────────────────────────────────
 // Body: { action: 'pause'|'resume'|'next'|'prev'|'volume'|'shuffle', value }
+// Actions target the Mira Connect device when it's online.
 router.post('/control', safe(async (req, res) => {
   const { action, value } = req.body
   const io = req.app.get('io')
 
+  const deviceId = await resolveDeviceId()
+  const dev = deviceId ? '&device_id=' + deviceId : ''
+  const devQ = deviceId ? '?device_id=' + deviceId : ''
+
   switch (action) {
-    case 'pause':   await spotify('PUT',  '/me/player/pause');    break
-    case 'resume':  await spotify('PUT',  '/me/player/play');     break
-    case 'next':    await spotify('POST', '/me/player/next');     break
-    case 'prev':    await spotify('POST', '/me/player/previous'); break
+    case 'pause':   await spotify('PUT',  '/me/player/pause'    + devQ); break
+    case 'resume':  await spotify('PUT',  '/me/player/play'     + devQ); break
+    case 'next':    await spotify('POST', '/me/player/next'     + devQ); break
+    case 'prev':    await spotify('POST', '/me/player/previous' + devQ); break
     case 'volume':
       await spotify('PUT',
-        '/me/player/volume?volume_percent=' + Math.min(100, Math.max(0, parseInt(value) || 50)))
+        '/me/player/volume?volume_percent=' + Math.min(100, Math.max(0, parseInt(value) || 50)) + dev)
       break
     case 'shuffle':
-      await spotify('PUT', '/me/player/shuffle?state=' + (value ? 'true' : 'false'))
+      await spotify('PUT', '/me/player/shuffle?state=' + (value ? 'true' : 'false') + dev)
       break
     default:
       return res.status(400).json({ error: 'Unknown action: ' + action })
@@ -305,12 +371,14 @@ router.get('/position', safe(async (req, res) => {
 }))
 
 // ── GET /api/spotify/analysis?track_id= ───────────────────────
-// Returns beat timestamps for visualizer sync. Cached forever (analysis is immutable).
-const _analysisCache = {}
+// Analysis is immutable, but beats[] arrays are large — keep only the 20 most
+// recent tracks instead of every track ever played.
+const _analysisCache = new BoundedCache({ max: 20 })
 router.get('/analysis', safe(async (req, res) => {
   const { track_id } = req.query
   if (!track_id) return res.status(400).json({ error: 'track_id required' })
-  if (_analysisCache[track_id]) return res.json(_analysisCache[track_id])
+  const cached = _analysisCache.get(track_id)
+  if (cached) return res.json(cached)
 
   const data = await spotify('GET', '/audio-analysis/' + track_id)
 
@@ -320,7 +388,7 @@ router.get('/analysis', safe(async (req, res) => {
     bars:   (data.bars   || []).map(b => ({ ms: Math.round(b.start * 1000) })),
   }
 
-  _analysisCache[track_id] = result
+  _analysisCache.set(track_id, result)
   res.json(result)
 }))
 
