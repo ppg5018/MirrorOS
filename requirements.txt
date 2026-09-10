@@ -1,13 +1,21 @@
 # MirrorOS — Python dependencies
-# Install: pip3 install -r requirements.txt
+# Install: bash scripts/setup-voice.sh   (does both steps below)
+#   pip3 install -r requirements.txt
+#   pip3 install --no-deps "openwakeword>=0.6.0"
+# (Pi OS Bookworm+ also needs --break-system-packages on both — the script adds it.)
 
 # Wake word detection (openWakeWord — open-source, no cloud, no AccessKey)
-openwakeword>=0.6.0
+#
+# openwakeword itself is deliberately NOT listed: on Linux it hard-requires
+# tflite-runtime, which has no wheels for Python 3.12+ (the Pi runs 3.13), so
+# listing it makes `pip3 install -r` fail for the whole file. It is installed
+# with --no-deps instead, and its real runtime deps are listed here. Inference
+# uses onnxruntime (WAKE_FRAMEWORK=onnx, the default) — tflite is unavailable.
 onnxruntime>=1.10.0
 numpy>=1.24
-# On Raspberry Pi, tflite-runtime is lighter than onnxruntime. Set
-# WAKE_FRAMEWORK=tflite in ecosystem.config.js to actually use it:
-#   pip3 install tflite-runtime
+tqdm>=4.0
+scipy>=1.3
+scikit-learn>=1.0
 
 # Audio I/O
 pyaudio>=0.2.13

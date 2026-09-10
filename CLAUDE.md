@@ -494,7 +494,7 @@ Voice-process env (set in `ecosystem.config.js`, not `.env`) — these are the n
 | `MIC_DEVICE` | `mirror_mic` | PortAudio input name (exact, else substring). Unset → `mirror_mic` if present, else default input. Missing → warning + default |
 | `WAKE_MODEL` | `hey_jarvis` | Bundled openWakeWord model (`hey_jarvis`, `hey_mycroft`, `hey_rhasspy`, `alexa`) |
 | `WAKE_WORD_PATH` | — | Absolute path to a custom `.onnx`/`.tflite` model (overrides `WAKE_MODEL`) |
-| `WAKE_FRAMEWORK` | inferred | `onnx` or `tflite` — tflite is lighter on a Pi |
+| `WAKE_FRAMEWORK` | inferred | `onnx` or `tflite`. Use `onnx` on the Pi — `tflite-runtime` has no wheels for Python 3.12+ |
 | `WAKE_THRESHOLD` | `0.35` | Detection cutoff. Genuine speech measures 0.93–0.99; ambient <0.01 |
 | `WAKE_COOLDOWN` | `1.5` | Deaf window after replying so the mirror can't hear its own voice |
 | `WAKE_DEBUG` | off | Log mic level + score every ~2s |
@@ -529,7 +529,7 @@ npm run pm2:logs   # tail logs
 npm run health     # scripts/health-check.sh
 ```
 
-PM2 runs three apps (`ecosystem.config.js`): `mirroros-backend` (Node), `mirroros-voice` (`wakeword.py`), and `mirroros-pir` (`pir.py`). Python deps: `pip3 install -r requirements.txt`. Piper voice download: `python3 -m piper.download_voices en_US-amy-medium --download-dir server/voice/piper-voices`.
+PM2 runs three apps (`ecosystem.config.js`): `mirroros-backend` (Node), `mirroros-voice` (`wakeword.py`), and `mirroros-pir` (`pir.py`). Python deps: `bash scripts/setup-voice.sh` — it runs `pip3 install -r requirements.txt` **plus** `pip3 install --no-deps openwakeword` (openwakeword hard-requires `tflite-runtime` on Linux, which has no wheels for Python 3.12+; the Pi runs 3.13), adding `--break-system-packages` on PEP 668 systems. Never put `openwakeword` back into requirements.txt. Piper voice download: `python3 -m piper.download_voices en_US-amy-medium --download-dir server/voice/piper-voices`.
 
 **Testing:** there is no automated test runner or `*.test.js` suite. Verification is manual via the scripts (`test:mic`, `test:voice`, `test:tts`, `health`). When adding logic that codex will review, prefer small, testable functions and verify behavior by exercising the relevant `/api/*` route or tool path.
 

@@ -24,32 +24,35 @@ sudo apt-get install -y \
 
 # ── Python packages ─────────────────────────────────────────
 echo "[2/4] Installing Python packages..."
-pip3 install --upgrade pip
-pip3 install -r requirements.txt
+# Pi OS (Bookworm+) marks the system Python "externally managed" (PEP 668) and
+# refuses plain pip installs. The mirror runs on system python3 under PM2, so
+# install there explicitly (as your user, not sudo — it lands in ~/.local).
+PIP_FLAGS=()
+if python3 -c 'import os, sys, sysconfig; sys.exit(0 if sys.prefix == sys.base_prefix and os.path.exists(os.path.join(sysconfig.get_path("stdlib"), "EXTERNALLY-MANAGED")) else 1)'; then
+  PIP_FLAGS+=(--break-system-packages)
+fi
+pip3 install "${PIP_FLAGS[@]}" -r requirements.txt
+# openwakeword hard-requires tflite-runtime on Linux, which has no wheels for
+# Python 3.12+ — install it without deps (its real deps are in requirements.txt).
+pip3 install "${PIP_FLAGS[@]}" --no-deps "openwakeword>=0.6.0"
+python3 -c "import openwakeword; print('  openwakeword: OK')"
 
-# ── Download Whisper Tiny model ──────────────────────────────
-echo "[3/4] Pre-downloading Whisper Tiny model..."
-python3 -c "import whisper; whisper.load_model('tiny'); print('Whisper tiny: OK')"
+# ── Download Whisper model (offline STT fallback) ───────────
+WHISPER_MODEL="${WHISPER_MODEL:-base}"   # same default transcribe.py uses
+echo "[3/4] Pre-downloading Whisper '$WHISPER_MODEL' model..."
+python3 -c "import whisper; whisper.load_model('$WHISPER_MODEL'); print('  Whisper $WHISPER_MODEL: OK')"
 
 # ── Test audio device ────────────────────────────────────────
 echo "[4/4] Checking audio devices..."
-arecord -l 2>/dev/null || echo "  WARNING: No recording devices found. Check USB mic is connected."
+arecord -l 2>/dev/null || echo "  WARNING: No recording devices found. For the INMP441 mic run: sudo bash scripts/setup-mic.sh"
 aplay  -l 2>/dev/null || echo "  WARNING: No playback devices found."
 
 echo ""
 echo "=== Setup complete! ==="
 echo ""
 echo "Next steps:"
-echo "  1. Add PORCUPINE_ACCESS_KEY to your .env file"
-echo "     Get a free key at: https://console.picovoice.ai"
-echo ""
-echo "  2. (Optional) Train a custom 'Hey Mirror' wake word:"
-echo "     https://console.picovoice.ai/ppn"
-echo "     Then set KEYWORD_PATH=/path/to/hey-mirror.ppn in .env"
-echo ""
-echo "  3. Set default wake keyword (built-in) in .env:"
-echo "     WAKE_KEYWORD=picovoice"
-echo ""
-echo "  4. Start the voice process:"
-echo "     pm2 start ecosystem.config.js"
-echo "     OR for testing: python3 server/voice/wakeword.py"
+echo "  1. INMP441 mic:  sudo bash scripts/setup-mic.sh   (run, reboot, run again)"
+echo "  2. Start / restart the voice loop:"
+echo "       pm2 restart ecosystem.config.js --only mirroros-voice --update-env"
+echo "     OR for testing:  python3 server/voice/wakeword.py"
+echo "  Wake word is \"Hey Jarvis\" by default (WAKE_MODEL in ecosystem.config.js)."
