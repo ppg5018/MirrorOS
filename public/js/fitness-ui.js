@@ -140,6 +140,17 @@ var FALLBACK_INSTRUCTIONS = [
   'Exhale on exertion, inhale on return'
 ]
 
+// Animation source for a workout entry. The server keys media by plain
+// exercise id and lazily fetches anything missing from disk, so an id is all
+// this needs — see server/fitness/media-cache.js.
+function gifFor(entry) {
+  if (!entry) return ''
+  var ex = entry.exercise || entry
+  if (ex.localGif) return ex.localGif
+  var id = ex.id || entry.exerciseId
+  return id ? '/data/gifs/' + id + '.gif' : ''
+}
+
 function renderExercise(entry) {
   var ex   = entry.exercise || entry
   var name = ex.name || entry.name || entry.exerciseId || 'Exercise'
@@ -155,10 +166,7 @@ function renderExercise(entry) {
   var ph   = wrap.querySelector('.exercise-placeholder')
   if (ph) ph.remove()
 
-  var gifSrc = ''
-  if (ex.id)             gifSrc = '/data/gifs/' + ex.id + '.gif'
-  else if (entry.exerciseId) gifSrc = '/data/gifs/' + entry.exerciseId + '.gif'
-  if (ex.gifUrl)         gifSrc = ex.gifUrl || gifSrc
+  var gifSrc = gifFor(entry)
 
   img.style.opacity = '0'
   if (gifSrc) {
@@ -210,10 +218,8 @@ function showImagePlaceholder(wrap, name) {
 function preloadNextImage(exercises, currentIdx) {
   var nextIdx = currentIdx + 1
   if (nextIdx >= exercises.length) return
-  var next = exercises[nextIdx]
-  var nex  = next.exercise || next
-  var id   = nex.id || next.exerciseId
-  if (id) { var img = new Image(); img.src = '/data/gifs/' + id + '.gif' }
+  var src = gifFor(exercises[nextIdx])
+  if (src) { var img = new Image(); img.src = src }
 }
 
 function updateNextSetBtn(data) {
@@ -262,9 +268,7 @@ function renderUpNextExercise(entry) {
   document.getElementById('up-next-sets').textContent =
     (entry.sets || 1) + ' sets × ' + (entry.reps || 10) + ' reps'
   var img    = document.getElementById('up-next-image')
-  var gifSrc = ''
-  if (ex.id)             gifSrc = '/data/gifs/' + ex.id + '.gif'
-  else if (entry.exerciseId) gifSrc = '/data/gifs/' + entry.exerciseId + '.gif'
+  var gifSrc = gifFor(entry)
   if (gifSrc) {
     img.src = gifSrc; img.style.display = 'block'
     img.onerror = function () { this.style.display = 'none' }
@@ -384,15 +388,14 @@ function showRestOverlay(data) {
 
   var nextName = '—', nextGif = ''
   if (data.nextUp) {
-    var ex, exId
+    var ex
     if (data.nextUp.type === 'next_set' && data.nextUp.exercise) {
       ex = data.nextUp.exercise.exercise || data.nextUp.exercise
       nextName = ex.name || data.nextUp.exercise.name || 'Same exercise'
     } else if (data.nextUp.type === 'next_exercise' && data.nextUp.exercise) {
       ex   = data.nextUp.exercise.exercise || data.nextUp.exercise
-      exId = ex.id || data.nextUp.exercise.exerciseId
       nextName = ex.name || data.nextUp.exercise.name || 'Next exercise'
-      if (exId) nextGif = '/data/gifs/' + exId + '.gif'
+      nextGif = gifFor(data.nextUp.exercise)
     } else if (data.nextUp.type === 'complete') {
       nextName = 'Finish strong!'
     }

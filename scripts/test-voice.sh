@@ -10,7 +10,7 @@ echo "=== MirrorOS Voice Pipeline Test ==="
 echo ""
 
 # ── TEST 1: TTS ──────────────────────────────────────────────
-echo "TEST 1 — pyttsx3 Text-to-Speech"
+echo "TEST 1 — Text-to-Speech (Sarvam Bulbul → Piper → pyttsx3)"
 python3 server/voice/speak.py "Hello, I am MirrorOS. Voice is working correctly."
 echo ""
 read -p "Did you hear audio? (y/n): " ans1
@@ -25,12 +25,14 @@ echo "  ✓ TTS working"
 echo ""
 
 # ── TEST 2: Whisper STT ──────────────────────────────────────
-echo "TEST 2 — Whisper Tiny Speech-to-Text"
+echo "TEST 2 — Speech-to-Text (Sarvam Saarika → Whisper)"
 echo "Recording 4 seconds — say something now..."
 sleep 1
 
 python3 - <<'EOF'
-import pyaudio, wave
+import sys, pyaudio, wave
+sys.path.insert(0, 'server/voice')
+from mic import resolve_input_device   # same mic the voice loop uses
 
 RATE   = 16000
 CHUNK  = 512
@@ -38,8 +40,11 @@ SECS   = 4
 OUTPUT = '/tmp/test_audio.wav'
 
 pa     = pyaudio.PyAudio()
+mic_index, mic_desc = resolve_input_device(pa)
+print(f'Using microphone {mic_desc}')
 stream = pa.open(rate=RATE, channels=1, format=pyaudio.paInt16,
-                 input=True, frames_per_buffer=CHUNK)
+                 input=True, input_device_index=mic_index,
+                 frames_per_buffer=CHUNK)
 
 frames = [stream.read(CHUNK, exception_on_overflow=False)
           for _ in range(int(RATE / CHUNK * SECS))]

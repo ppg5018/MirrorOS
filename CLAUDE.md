@@ -26,7 +26,7 @@ The Pi runs three PM2 processes: the Node backend, the Python voice loop, and th
 | Wake word | **openWakeWord** (Python, `server/voice/wakeword.py`) — open-source, no cloud, no access key. Default keyword `jarvis`; supports custom `.onnx` models |
 | Speech-to-text | **Sarvam Saarika** (cloud, Hinglish-aware) if `SARVAM_API_KEY` set, else **Whisper** `base` offline (`server/voice/transcribe.py`) |
 | Text-to-speech | **Sarvam Bulbul** (cloud) if `SARVAM_API_KEY` set, else **Piper** neural offline, else `pyttsx3` (`server/voice/speak.py`) |
-| Music | Spotify Web API + Web Playback SDK |
+| Music | Spotify Web API (control) + Raspotify/librespot Connect device on the Pi (audio) — **no** Web Playback SDK |
 | WhatsApp | **Baileys** (`@whiskeysockets/baileys`) — QR-linked, message reading |
 | Calendar/Gmail | Google APIs via OAuth2 (`googleapis`) |
 | Fitness data | ExerciseDB API |
@@ -35,7 +35,7 @@ The Pi runs three PM2 processes: the Node backend, the Python voice loop, and th
 | HTTP (server) | `node-fetch` v2 — **never axios** |
 | Process mgr | PM2 (`ecosystem.config.js`) |
 | Logging | `pino` (`server/logger.js`) |
-| Hardware | PIR motion sensor + WS2812B LED strip (Python, GPIO) |
+| Hardware | PIR motion sensor + WS2812B LED strip + INMP441 I2S mic (Python, GPIO) |
 
 The `open` npm package is ESM-only (v11) — use `await import('open')`, never `require('open')`.
 
@@ -86,6 +86,7 @@ MirrorOS/
 │   │   ├── wakeword.py           ← openWakeWord always-listening loop; records → transcribe → /api/voice → speak
 │   │   ├── transcribe.py         ← Sarvam Saarika or Whisper base
 │   │   ├── speak.py              ← Sarvam Bulbul, Piper, or pyttsx3
+│   │   ├── mic.py                ← Picks the recording device (MIC_DEVICE → "mirror_mic" → default)
 │   │   └── piper-voices/         ← en_US-amy-medium.onnx (downloaded once)
 │   ├── sensors/
 │   │   └── pir.py                ← HC-SR501 on GPIO; screen on/off; POST /api/sensors/motion
@@ -104,7 +105,7 @@ MirrorOS/
 │   ├── js/
 │   │   ├── main.js               ← Dashboard boot, clock, weather, calendar, tasks, wallpaper, viewport zoom
 │   │   ├── socket.js             ← Socket.io client — all dashboard socket listeners
-│   │   ├── spotify-player.js     ← Spotify Web Playback SDK wrapper
+│   │   ├── spotify-player.js     ← Spotify Connect control (no SDK); polls /devices for the Mira speaker
 │   │   ├── music-widget.js       ← Now Playing widget
 │   │   ├── slideshow.js          ← Ambient photo slideshow
 │   │   ├── screensaver.js        ← Screensaver / video wallpaper mode
@@ -159,7 +160,6 @@ MirrorOS/
 | `/reconnect` | inline HTML in `server/index.js` | Quick re-auth launcher (redirects to `/setup`) |
 | `/auth/google/callback` | inline in `server/index.js` | Google OAuth callback (localhost redirect on the Pi) |
 | `/auth/callback` | inline in `server/index.js` | Legacy alias → `/auth/google/callback` |
-| `/spotify/token` | inline in `server/index.js` | Token for Web Playback SDK |
 
 Static mounts: `/uploads` (photos, 1d cache), `/data/gifs` (7d immutable), `/screensaver` (videos/thumbs, 7d), plus `public/` (1h cache).
 
@@ -223,8 +223,31 @@ Registered in `server/index.js`. All under `/api/*` (guarded except loopback).
 | `GET /top-tracks` | Top tracks (short term) |
 | `GET /liked-songs` | Liked songs (20) |
 | `GET /playlists` | User playlists |
+| `GET /devices` | Connect devices + which one is Mira's speaker (`isTarget`) |
 
 `/position` mock (when no Spotify token): cycles `position_ms` via `Date.now() % 278000`, returns "Tum Hi Ho" by Arijit Singh.
+
+### Spotify audio routing — how music reaches the mirror
+
+Two separate connections. **Control** is the Web API (OAuth token in
+`config/spotify-token.json`). **Audio** is a Raspotify/librespot Spotify Connect
+device running on the Pi, named `Mira` — the backend only *targets* it, it never
+streams audio itself.
+
+`resolveDevice()` in `server/routes/spotify.js` looks up that device by name and
+**refuses to play if it is missing** rather than falling back to whatever phone
+or TV happens to be active — a silent fallback hijacks the owner's other devices
+and hides the fact that librespot is down. `/play` and `/control` then return
+**409 `{ code: 'no_target_device' }`**, which `playOnMira()` in `functions.js`
+turns into a spoken explanation. Set `SPOTIFY_ALLOW_FALLBACK_DEVICE=true` to
+restore the old any-device behaviour.
+
+librespot only appears in `/me/player/devices` **after** the owner selects it
+once from the Spotify app on the same Wi-Fi (zeroconf linking; Premium required).
+Its device id changes on every restart, so `withFreshDevice()` re-resolves and
+retries once on a 404.
+
+Diagnose with `npm run spotify:devices`.
 
 ### Karaoke lyrics
 `GET /api/karaoke/lyrics?artist=&track=&album=` → LRCLIB fetch, parse LRC (standard + Enhanced), add estimated word timings — 24h cache. Returns `{ synced, lines: [{ time, text, words:[{time,text}] }] }` or `{ error: 'not_found' }`.
@@ -281,7 +304,7 @@ The tool loop is agentic: one assistant turn may contain multiple `tool_use` blo
 | `tasks-updated` | `{ tasks }` | Task list changed |
 | `habits-updated` | — | Habits changed or midnight rollover |
 | `music-update` | — | Spotify state changed — refetch |
-| `spotify-play` | `{ uri }` | Play this Spotify URI (Web Playback SDK) |
+| `spotify-play` | `{ uri }` | Nudge for dashboards to refresh Now Playing — **does not start playback** |
 | `spotify-control` | `{ action, value }` | Control Spotify player |
 | `media-pause` / `media-resume` | — | Duck/unduck audio (voice loop) |
 | `mode:karaoke` | `{ track? }` | Go to karaoke page |
@@ -354,7 +377,9 @@ The dashboard's AI test input bar (`initTestInput()` in `main.js`) bypasses the 
 
 **PIR sensor** (`server/sensors/pir.py`, HC-SR501): controls screen power (`vcgencmd` / `xrandr`), turns the display off after `SCREEN_TIMEOUT` seconds of no motion, and POSTs `/api/sensors/motion`. Falls back to a no-GPIO simulation on dev machines.
 
-**LED strip** (`server/led/controller.py`, WS2812B): invoked as `python3 controller.py <mode> [brightness]` from `/api/backlight`. Modes: warm, cool, night, party, music_sync, red, green, blue, off.
+**LED strip** (`server/led/controller.py`, WS2812B): invoked as `python3 controller.py <mode> [brightness]` from `/api/backlight`. Modes: warm, cool, night, party, music_sync, red, green, blue, off. Strip not wired yet. Note `LED_PIN = 18` (pin 12) is now the mic's I2S clock — pick another pin when the strip is added.
+
+**Microphone** (INMP441, I2S): VDD→pin 1, GND→pin 6, L/R→pin 9 (GND), SCK→pin 12 (GPIO18), WS→pin 35 (GPIO19), SD→pin 38 (GPIO20). `sudo bash scripts/setup-mic.sh` (run, reboot, run again) enables `dtoverlay=googlevoicehat-soundcard` and writes the ALSA device `mirror_mic` to `/etc/asound.conf`: 48 kHz/S32 stereo hardware → any rate/format, both I2S slots summed, software gain = `MIC_GAIN_DB` (default 24). `server/voice/mic.py` selects it for `wakeword.py`, `test-mic.py` and `test-voice.sh`. The card is opened exclusively — stop `mirroros-voice` before running other mic tools. The overlay also claims GPIO16 (pin 36); keep it free.
 
 **Scheduler** (`server/scheduler.js`):
 - Fixed briefing via `BRIEFING_CRON` (default `0 7 * * *` IST).
@@ -445,6 +470,8 @@ MIRROR_API_KEY=           # Optional shared secret; auto-generated to config/api
 
 SPOTIFY_CLIENT_ID=
 SPOTIFY_CLIENT_SECRET=
+SPOTIFY_DEVICE_NAME=Mira          # Connect device name the Web API targets
+SPOTIFY_ALLOW_FALLBACK_DEVICE=false  # true = play on any device when Mira is offline
 GOOGLE_CLIENT_ID=         # Calendar + Gmail
 GOOGLE_CLIENT_SECRET=
 NEWSAPI_KEY=
@@ -460,7 +487,26 @@ BRIEFING_COOLDOWN_HOURS=2
 BRIEFING_PIR_DELAY_MS=3000
 ```
 
-Voice-process env (set in `ecosystem.config.js`, not `.env`): `WAKE_KEYWORD` (default `jarvis`), `RECORD_SECONDS`, `WHISPER_LANG`, optional `KEYWORD_PATH` / `WAKE_WORD_PATH` for a custom `.onnx` model, and `SARVAM_API_KEY` (+ `SARVAM_STT_*` / `SARVAM_TTS_*`) to enable Sarvam STT/TTS. `PORCUPINE_ACCESS_KEY` remains in `.env.example` for legacy reasons but the wake word engine is now openWakeWord and does not require it.
+Voice-process env (set in `ecosystem.config.js`, not `.env`) — these are the names `wakeword.py` actually reads:
+
+| Var | Default | Purpose |
+|---|---|---|
+| `MIC_DEVICE` | `mirror_mic` | PortAudio input name (exact, else substring). Unset → `mirror_mic` if present, else default input. Missing → warning + default |
+| `WAKE_MODEL` | `hey_jarvis` | Bundled openWakeWord model (`hey_jarvis`, `hey_mycroft`, `hey_rhasspy`, `alexa`) |
+| `WAKE_WORD_PATH` | — | Absolute path to a custom `.onnx`/`.tflite` model (overrides `WAKE_MODEL`) |
+| `WAKE_FRAMEWORK` | inferred | `onnx` or `tflite` — tflite is lighter on a Pi |
+| `WAKE_THRESHOLD` | `0.35` | Detection cutoff. Genuine speech measures 0.93–0.99; ambient <0.01 |
+| `WAKE_COOLDOWN` | `1.5` | Deaf window after replying so the mirror can't hear its own voice |
+| `WAKE_DEBUG` | off | Log mic level + score every ~2s |
+| `RECORD_SECONDS` | `8` | Max utterance length |
+| `SILENCE_SECONDS` / `SILENCE_THRESHOLD` / `PRESPEECH_TIMEOUT` | `0.7` / `500` / `3.0` | Endpointing |
+| `WHISPER_MODEL` / `WHISPER_LANG` | `base` / auto | Offline STT fallback only. Empty `WHISPER_LANG` = auto-detect |
+
+`SARVAM_API_KEY` (+ `SARVAM_STT_*` / `SARVAM_TTS_*`) lives in `.env` and enables Sarvam STT/TTS; **`SARVAM_TTS_MODEL` must be `bulbul:v3`** — Sarvam retired `bulbul:v2` and it now 400s on every request. Legacy v2 speaker names are auto-remapped in `speak.py`.
+
+`WAKE_KEYWORD`, `KEYWORD_PATH` and `PORCUPINE_ACCESS_KEY` are dead names from the old Porcupine engine — nothing reads them. Don't add them back.
+
+**Wake word resolution order:** `config/wakeword.json` (`{"builtin": "hey_jarvis"}` or `{"file": "custom.onnx"}` loaded from `server/voice/wakewords/`) → `WAKE_WORD_PATH` → `WAKE_MODEL`. A config naming a `file` that doesn't exist falls back to the built-in and logs a loud warning — that mismatch means the mirror listens for a different phrase than the config advertises.
 
 ### Auth setup commands
 ```bash

@@ -9,9 +9,14 @@ Priority chain:
 
 Sarvam config (env / .env):
   SARVAM_API_KEY        required to use Sarvam
-  SARVAM_TTS_MODEL      default: bulbul:v2   (or bulbul:v3)
-  SARVAM_TTS_SPEAKER    default: anushka     (v2 female: anushka/manisha/vidya/arya;
-                                              v2 male: abhilash/karun/hitesh)
+  SARVAM_TTS_MODEL      default: bulbul:v3   (v2 was deprecated server-side and
+                                              now 400s on every request)
+  SARVAM_TTS_SPEAKER    default: ritu        (v3 female: ritu/priya/neha/pooja/
+                                              simran/kavya/ishita/shreya/tanya...;
+                                              v3 male: aditya/ashutosh/rahul/rohan/
+                                              amit/dev/varun/kabir...)
+                        Legacy v2 speaker names (anushka, manisha, abhilash...) are
+                        auto-remapped to their closest v3 voice — see V2_TO_V3.
   SARVAM_TTS_LANG       default: en-IN
   SARVAM_TTS_PACE       default: 1.0
 
@@ -46,6 +51,41 @@ PIPER_VOICE   = os.environ.get('PIPER_VOICE', DEFAULT_VOICE)
 LENGTH_SCALE  = os.environ.get('PIPER_LENGTH_SCALE', '1.0')
 
 SARVAM_URL    = 'https://api.sarvam.ai/text-to-speech'
+
+# Sarvam retired bulbul:v2 (it now 400s on every request) and v3 rejects the old
+# speaker names outright. Existing installs have a v2 name sitting in .env, so
+# remap rather than hard-fail — an unrecognised speaker takes down every reply.
+V2_TO_V3 = {
+    'anushka': 'ritu',      'manisha': 'priya',   'vidya': 'neha',
+    'arya':    'pooja',     'abhilash': 'aditya', 'karun': 'rahul',
+    'hitesh':  'ashutosh',
+}
+
+# Valid bulbul:v3 speakers, per the API's own error message.
+V3_SPEAKERS = {
+    'aditya', 'ritu', 'ashutosh', 'priya', 'neha', 'rahul', 'pooja', 'rohan',
+    'simran', 'kavya', 'amit', 'dev', 'ishita', 'shreya', 'ratan', 'varun',
+    'manan', 'sumit', 'roopa', 'kabir', 'aayan', 'shubh', 'advait', 'anand',
+    'tanya', 'tarun', 'sunny', 'mani', 'gokul', 'vijay', 'shruti', 'suhani',
+    'mohit', 'kavitha', 'rehan', 'soham', 'rupali',
+}
+
+
+def _resolve_speaker(model, speaker):
+    """Map a configured speaker onto one the selected model accepts."""
+    speaker = (speaker or '').strip().lower()
+    if not model.startswith('bulbul:v3'):
+        return speaker
+    if speaker in V3_SPEAKERS:
+        return speaker
+    mapped = V2_TO_V3.get(speaker)
+    if mapped:
+        print(f'[speak] speaker "{speaker}" is bulbul:v2-only — using "{mapped}" for {model}',
+              file=sys.stderr)
+        return mapped
+    print(f'[speak] unknown speaker "{speaker}" for {model} — using "ritu"',
+          file=sys.stderr)
+    return 'ritu'
 
 
 def _play(wav_path):
@@ -85,11 +125,13 @@ def speak_sarvam(text):
 
     import requests
 
+    model = os.environ.get('SARVAM_TTS_MODEL', 'bulbul:v3')
     body = {
-        'text': text[:1400],  # v2 caps at 1500 chars; mirror replies are short
+        'text': text[:1400],  # API caps at 1500 chars; mirror replies are short
         'target_language_code': os.environ.get('SARVAM_TTS_LANG', 'en-IN'),
-        'model': os.environ.get('SARVAM_TTS_MODEL', 'bulbul:v2'),
-        'speaker': os.environ.get('SARVAM_TTS_SPEAKER', 'anushka'),
+        'model': model,
+        'speaker': _resolve_speaker(
+            model, os.environ.get('SARVAM_TTS_SPEAKER', 'ritu')),
         'speech_sample_rate': 22050,
         'pace': float(os.environ.get('SARVAM_TTS_PACE', '1.0')),
     }

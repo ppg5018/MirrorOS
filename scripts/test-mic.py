@@ -6,10 +6,16 @@ Run this to check your mic input before testing voice commands.
 Usage: python3 scripts/test-mic.py
 """
 
+import os
+import sys
 import pyaudio
 import struct
 import math
 import time
+
+# Same device choice as the voice loop (MIC_DEVICE env → "mirror_mic" → default)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'server', 'voice'))
+from mic import resolve_input_device
 
 SAMPLE_RATE = 16000
 CHUNK = 512
@@ -22,18 +28,27 @@ for i in range(pa.get_device_count()):
     if info['maxInputChannels'] > 0:
         print(f"  [{i}] {info['name']}")
 
+mic_index, mic_desc = resolve_input_device(pa)
+
 print()
-print('Testing default microphone for 5 seconds...')
+print(f'Testing microphone {mic_desc} for 5 seconds...')
 print('Speak normally and watch the level bar:')
 print()
 
-stream = pa.open(
-    rate=SAMPLE_RATE,
-    channels=1,
-    format=pyaudio.paInt16,
-    input=True,
-    frames_per_buffer=CHUNK
-)
+try:
+    stream = pa.open(
+        rate=SAMPLE_RATE,
+        channels=1,
+        format=pyaudio.paInt16,
+        input=True,
+        input_device_index=mic_index,
+        frames_per_buffer=CHUNK
+    )
+except Exception as e:
+    print(f'Could not open the microphone: {e}')
+    print('If it says "busy", the voice loop has the mic — run: pm2 stop mirroros-voice')
+    pa.terminate()
+    sys.exit(1)
 
 start = time.time()
 while time.time() - start < 5:
@@ -54,8 +69,10 @@ print('\n')
 print('Results:')
 print('  LOUD  (>2000) → good, voice commands will work well')
 print('  OK    (>500)  → fine, default SILENCE_THRESHOLD=500 works')
-print('  QUIET (<500)  → lower SILENCE_THRESHOLD in wakeword.py to 200')
+print('  QUIET (<500)  → Pi INMP441: raise gain, e.g. sudo MIC_GAIN_DB=30 bash scripts/setup-mic.sh')
+print('                  (or lower SILENCE_THRESHOLD in ecosystem.config.js to 200)')
 print()
 print('If bar barely moved at all:')
-print('  - Check mic is plugged in and set as default input device')
+print('  - Pi INMP441: check SD → pin 38, L/R → pin 9, then run sudo bash scripts/setup-mic.sh')
+print('  - USB mic: check it is plugged in, or set MIC_DEVICE to its name (listed above)')
 print('  - macOS: System Preferences → Sound → Input')

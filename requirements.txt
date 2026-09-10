@@ -5,7 +5,8 @@
 openwakeword>=0.6.0
 onnxruntime>=1.10.0
 numpy>=1.24
-# On Raspberry Pi, tflite-runtime is lighter than onnxruntime (set WAKE_FRAMEWORK=tflite):
+# On Raspberry Pi, tflite-runtime is lighter than onnxruntime. Set
+# WAKE_FRAMEWORK=tflite in ecosystem.config.js to actually use it:
 #   pip3 install tflite-runtime
 
 # Audio I/O

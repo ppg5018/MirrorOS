@@ -23,8 +23,10 @@ async function spotify(method, endpoint, body = null) {
   if (res.status === 204) return null
   if (res.status === 401) throw new Error('Spotify token expired')
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error('Spotify API ' + res.status + ': ' + (err.error?.message || endpoint))
+    const body = await res.json().catch(() => ({}))
+    const err = new Error('Spotify API ' + res.status + ': ' + (body.error?.message || endpoint))
+    err.status = res.status
+    throw err
   }
   return res.json()
 }
@@ -45,32 +47,90 @@ function targetDeviceName() {
   return 'Mira'
 }
 
-let _deviceCache = { id: null, at: 0 }
-const DEVICE_TTL = 30 * 1000
+// Cached device resolution. `value` is the chosen device or null; nulls are
+// cached too (briefly) so a play attempt while librespot is booting doesn't
+// hammer the devices endpoint.
+let _deviceCache = { value: undefined, at: 0 }
+const DEVICE_TTL      = 30 * 1000   // trust a resolved Mira device this long
+const DEVICE_MISS_TTL = 5  * 1000   // re-check quickly while Mira is offline
+
+// Playing on "whatever device is active" hijacks the owner's phone and hides
+// the fact that librespot is down — the whole point of the mirror is that audio
+// comes out of its own speaker. Opt back in with SPOTIFY_ALLOW_FALLBACK_DEVICE=true.
+const ALLOW_FALLBACK =
+  String(process.env.SPOTIFY_ALLOW_FALLBACK_DEVICE || '').toLowerCase() === 'true'
+
+function isTargetDevice(device, wanted) {
+  const name = (device.name || '').toLowerCase()
+  return name === wanted || name.includes(wanted)
+}
 
 async function listDevices() {
   const data = await spotify('GET', '/me/player/devices')
   return data?.devices || []
 }
 
-// Pick the device to target. Preference: the Mira Connect device (librespot on
-// the Pi) → whatever device is currently active → the first available device.
-// Cached 30s. Returns null only when no Spotify device is available at all.
-async function resolveDeviceId() {
-  if (_deviceCache.id && Date.now() - _deviceCache.at < DEVICE_TTL) return _deviceCache.id
+// Resolve the Connect device to play on. Returns { id, name, isTarget } or null.
+// isTarget=false only happens when SPOTIFY_ALLOW_FALLBACK_DEVICE is enabled.
+async function resolveDevice() {
+  const ttl = _deviceCache.value?.isTarget ? DEVICE_TTL : DEVICE_MISS_TTL
+  if (_deviceCache.at && Date.now() - _deviceCache.at < ttl) return _deviceCache.value
+
+  let devices
   try {
-    const wanted  = targetDeviceName().toLowerCase()
-    const devices = await listDevices()
-    if (!devices.length) return null
-    const mira   = devices.find(d => (d.name || '').toLowerCase() === wanted)
-             || devices.find(d => (d.name || '').toLowerCase().includes(wanted))
-    const active = devices.find(d => d.is_active)
-    const pick   = mira || active || devices[0]
-    if (pick) { _deviceCache = { id: pick.id, at: Date.now() }; return pick.id }
+    devices = await listDevices()
   } catch (e) {
     console.error('[Spotify] device resolve failed:', e.message)
+    return null   // don't cache transient API failures
   }
-  return null
+
+  const wanted = targetDeviceName().toLowerCase()
+  const mira   = devices.find(d => isTargetDevice(d, wanted))
+  const pick   = mira
+    || (ALLOW_FALLBACK ? (devices.find(d => d.is_active) || devices[0]) : null)
+
+  const value = pick
+    ? { id: pick.id, name: pick.name, isTarget: !!mira }
+    : null
+  if (!mira) {
+    console.warn(`[Spotify] Connect device "${targetDeviceName()}" not found` +
+      (value ? ` — falling back to "${value.name}"` : ' — refusing to play elsewhere'))
+  }
+  _deviceCache = { value, at: Date.now() }
+  return value
+}
+
+// Same as resolveDevice(), but throws a spoken-friendly error when the mirror's
+// own speaker isn't available instead of quietly playing somewhere else.
+async function requireDevice() {
+  const device = await resolveDevice()
+  if (device) return device
+  const name = targetDeviceName()
+  const err = new Error(
+    `Mira's Spotify speaker ("${name}") is offline. Start Raspotify on the Pi ` +
+    `(sudo systemctl restart raspotify), then open Spotify on the same Wi-Fi ` +
+    `and select "${name}" once to link it.`
+  )
+  err.code = 'no_target_device'
+  throw err
+}
+
+// Force the next resolve to re-query — call after anything that may change the
+// device list.
+function invalidateDeviceCache() { _deviceCache = { value: undefined, at: 0 } }
+
+// librespot gets a new device id every time it restarts, so a cached id can go
+// stale within the TTL and Spotify answers 404. Re-resolve once and retry.
+async function withFreshDevice(deviceId, run) {
+  try {
+    return await run(deviceId)
+  } catch (e) {
+    if (e.status !== 404) throw e
+    invalidateDeviceCache()
+    const fresh = await requireDevice()
+    if (fresh.id === deviceId) throw e
+    return run(fresh.id)
+  }
 }
 
 // Wrap routes in try/catch — returns 503 on any failure
@@ -78,7 +138,14 @@ function safe(fn) {
   return async (req, res) => {
     try { await fn(req, res) } catch (err) {
       console.error('[Spotify Route]', err.message)
-      res.status(503).json({ error: err.message, connected: false })
+      // no_target_device means the account is fine but Mira's speaker is absent —
+      // a different problem from Spotify being unreachable, so a different status.
+      const noDevice = err.code === 'no_target_device'
+      res.status(noDevice ? 409 : 503).json({
+        error:     err.message,
+        code:      err.code || null,
+        connected: noDevice
+      })
     }
   }
 }
@@ -236,7 +303,7 @@ router.get('/devices', safe(async (req, res) => {
     target: targetDeviceName(),
     devices: devices.map(d => ({
       id: d.id, name: d.name, type: d.type, active: d.is_active,
-      isTarget: (d.name || '').toLowerCase().includes(wanted)
+      isTarget: isTargetDevice(d, wanted)
     }))
   })
 }))
@@ -246,15 +313,19 @@ router.get('/devices', safe(async (req, res) => {
 // plays on the mirror's own speaker.
 router.post('/play', safe(async (req, res) => {
   const { uri } = req.body
-  const deviceId = req.body.deviceId || await resolveDeviceId()
+  const deviceId = req.body.deviceId || (await requireDevice()).id
   const body = uri
     ? (uri.includes('playlist') || uri.includes('album')
         ? { context_uri: uri }
         : { uris: [uri] })
     : {}
-  const endpoint = '/me/player/play' + (deviceId ? '?device_id=' + deviceId : '')
-  await spotify('PUT', endpoint, body)
-  res.json({ success: true, deviceId: deviceId || null })
+  // device_id on /play transfers playback to that device and starts it, which is
+  // what makes a freshly-idle librespot device pick up the audio.
+  const used = await withFreshDevice(deviceId, async id => {
+    await spotify('PUT', '/me/player/play?device_id=' + id, body)
+    return id
+  })
+  res.json({ success: true, deviceId: used })
 }))
 
 // ── POST /api/spotify/control ─────────────────────────────────
@@ -264,9 +335,9 @@ router.post('/control', safe(async (req, res) => {
   const { action, value } = req.body
   const io = req.app.get('io')
 
-  const deviceId = await resolveDeviceId()
-  const dev = deviceId ? '&device_id=' + deviceId : ''
-  const devQ = deviceId ? '?device_id=' + deviceId : ''
+  const { id: deviceId } = await requireDevice()
+  const dev  = '&device_id=' + deviceId
+  const devQ = '?device_id=' + deviceId
 
   switch (action) {
     case 'pause':   await spotify('PUT',  '/me/player/pause'    + devQ); break

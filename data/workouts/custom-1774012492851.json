@@ -3,7 +3,6 @@
   "exercises": [
     {
       "exerciseId": "0662",
-      "name": "Push Up",
       "sets": 3,
       "reps": 10,
       "restSeconds": 60

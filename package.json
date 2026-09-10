@@ -16,13 +16,15 @@
     "update": "bash scripts/update.sh",
     "setup:cron": "bash scripts/setup-cron.sh",
     "setup:pm2": "bash scripts/setup-pm2.sh",
+    "setup:mic": "sudo bash scripts/setup-mic.sh",
     "test:mic": "python3 scripts/test-mic.py",
     "test:voice": "bash scripts/test-voice.sh",
     "test:tts": "python3 server/voice/speak.py 'MirrorOS voice test'",
     "setup:spotify": "node scripts/spotify-auth.js",
     "setup:raspotify": "sudo bash scripts/setup-raspotify.sh",
     "reset:onboarding": "bash scripts/reset-onboarding.sh",
-    "setup:fitness": "node scripts/setup-fitness.js"
+    "setup:fitness": "node scripts/setup-fitness.js",
+    "spotify:devices": "node scripts/spotify-devices.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",

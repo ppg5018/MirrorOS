@@ -1,8 +1,9 @@
 /* ============================================
    MirrorOS — Karaoke overlay handler (dashboard)
    Loads /karaoke in a fullscreen iframe so the
-   Spotify Web Playback SDK stays alive on the
-   dashboard (music keeps playing through navigation).
+   dashboard's socket connection and widgets survive
+   the transition. (Audio itself plays on the Pi's own
+   Spotify Connect device, so it is unaffected either way.)
    ============================================ */
 ;(function () {
   let karaokeFrame = null

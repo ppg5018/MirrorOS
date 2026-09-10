@@ -30,3 +30,5 @@ server/voice/piper-voices/
 .~*
 MirrorOS_Parts_List.xlsx
 data/habits.json
+data/workouts/*.bak
+data/thumbs/

@@ -2,270 +2,262 @@
 /**
  * MirrorOS — Fitness Data Setup
  *
- * Fetches exercises from ExerciseDB (RapidAPI) and saves locally.
- * Run once: npm run setup:fitness
- * Uses ~24 of 100 free monthly API calls.
+ * Imports the open exercises dataset (hasaneyldrm/exercises-dataset) into
+ * data/exercises.json and downloads the 180x180 animation GIFs + thumbnails
+ * into data/gifs/ and data/thumbs/.
+ *
+ * Replaces the old ExerciseDB/RapidAPI flow — no API key, no monthly call
+ * quota, 1324 exercises with English *and* Hindi instructions.
+ *
+ *   npm run setup:fitness                # metadata + thumbs + all GIFs
+ *   npm run setup:fitness -- --no-media  # metadata only
+ *   npm run setup:fitness -- --thumbs    # metadata + thumbs, skip GIFs
+ *   npm run setup:fitness -- --only=0662,0630   # media for specific ids
+ *   npm run setup:fitness -- --used      # media only for ids used by data/workouts
+ *
+ * Media is © Gym visual (https://gymvisual.com/), redistributed by the dataset
+ * at 180x180. It is cached locally for this mirror only — data/gifs/ and
+ * data/thumbs/ are gitignored and must not be re-published.
  */
 
 const fs   = require('fs')
 const path = require('path')
-const readline = require('readline')
 
-// ── Load .env ─────────────────────────────────────────────
-const envPath = path.join(__dirname, '../.env')
-if (fs.existsSync(envPath)) {
-  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
-    line = line.trim()
-    if (line && !line.startsWith('#') && line.includes('=')) {
-      const [k, ...v] = line.split('=')
-      process.env[k.trim()] = v.join('=').trim()
-    }
-  })
-}
+const RAW_BASE = 'https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main'
 
-const API_KEY  = process.env.EXERCISEDB_API_KEY
-const API_HOST = process.env.EXERCISEDB_HOST || 'exercisedb.p.rapidapi.com'
-
-const DATA_DIR      = path.join(__dirname, '../data')
-const GIFS_DIR      = path.join(DATA_DIR, 'gifs')
+const DATA_DIR       = path.join(__dirname, '../data')
+const GIFS_DIR       = path.join(DATA_DIR, 'gifs')
+const THUMBS_DIR     = path.join(DATA_DIR, 'thumbs')
+const WORKOUTS_DIR   = path.join(DATA_DIR, 'workouts')
 const EXERCISES_PATH = path.join(DATA_DIR, 'exercises.json')
 
-const ALLOWED_EQUIPMENT = new Set([
-  'body weight', 'dumbbell', 'barbell', 'band', 'medicine ball', 'ez barbell'
-])
+const CONCURRENCY = 6
 
-// Separate bodyPart and equipment endpoint lists.
-// Spaces in URL path segments must be %20, NOT + signs.
-const BODY_PART_ENDPOINTS = [
-  'chest', 'back', 'waist',
-  'upper%20legs', 'lower%20legs',
-  'shoulders', 'upper%20arms',
-  'cardio', 'neck'
-]
-
-const EQUIPMENT_ENDPOINTS = [
-  'body%20weight', 'dumbbell', 'barbell'
-]
+// ── CLI flags ─────────────────────────────────────────────
+const argv       = process.argv.slice(2)
+const NO_MEDIA   = argv.includes('--no-media')
+const THUMBS_ONLY = argv.includes('--thumbs')
+const USED_ONLY  = argv.includes('--used')
+const ONLY_ARG   = argv.find(a => a.startsWith('--only='))
+const ONLY_IDS   = ONLY_ARG ? ONLY_ARG.slice('--only='.length).split(',').map(s => s.trim()).filter(Boolean) : null
 
 // ── Helpers ───────────────────────────────────────────────
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
-
-async function ask(question) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  return new Promise(resolve => {
-    rl.question(question, answer => { rl.close(); resolve(answer.trim().toLowerCase()) })
-  })
-}
-
-async function apiFetch(endpoint) {
-  // Dynamic import for node-fetch (project uses v2 which is CJS-compatible)
-  const fetch = require('node-fetch')
-  const url = `https://${API_HOST}${endpoint}`
-  console.log(`  → GET ${endpoint}`)
-  const res = await fetch(url, {
-    headers: {
-      'x-rapidapi-key':  API_KEY,
-      'x-rapidapi-host': API_HOST
-    }
-  })
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText} for ${endpoint}`)
-  return res.json()
-}
-
-// Download a URL as a binary Buffer using native https/http (no external deps)
-function downloadBinary(url) {
+// Download a URL as a Buffer using native https (no external deps).
+function downloadBinary(url, redirects = 0) {
   return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https') ? require('https') : require('http')
-    lib.get(url, (res) => {
-      // Follow redirects (up to 3)
+    if (redirects > 4) return reject(new Error('too many redirects'))
+    const req = require('https').get(url, { timeout: 30000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return downloadBinary(res.headers.location).then(resolve).catch(reject)
+        res.resume()
+        return downloadBinary(new URL(res.headers.location, url).toString(), redirects + 1)
+          .then(resolve).catch(reject)
       }
       if (res.statusCode !== 200) {
         res.resume()
         return reject(new Error(`HTTP ${res.statusCode}`))
       }
       const chunks = []
-      res.on('data', chunk => chunks.push(chunk))
-      res.on('end',  ()    => resolve(Buffer.concat(chunks)))
+      res.on('data', c => chunks.push(c))
+      res.on('end',  () => resolve(Buffer.concat(chunks)))
       res.on('error', reject)
-    }).on('error', reject)
+    })
+    req.on('timeout', () => req.destroy(new Error('timeout')))
+    req.on('error', reject)
   })
+}
+
+// Run `worker` over `items` with a bounded pool, reporting progress.
+async function pool(items, worker, label) {
+  let done = 0, ok = 0, failed = 0, skipped = 0
+  let firstError = null
+  const queue = items.slice()
+
+  async function run() {
+    for (;;) {
+      const item = queue.shift()
+      if (item === undefined) return
+      try {
+        const r = await worker(item)
+        if (r === 'skip') skipped++; else ok++
+      } catch (err) {
+        failed++
+        if (!firstError) firstError = `${item.id || item}: ${err.message}`
+      }
+      done++
+      if (done % 25 === 0 || done === items.length) {
+        const pct = Math.round((done / items.length) * 100)
+        process.stdout.write(`\r  ${label}: ${done}/${items.length} (${pct}%)  ok=${ok} cached=${skipped} failed=${failed}   `)
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length || 1) }, run))
+  process.stdout.write('\n')
+  if (firstError) console.log(`  first error: ${firstError}`)
+  return { ok, failed, skipped }
 }
 
 function dirSize(dir) {
   let total = 0
   try {
-    fs.readdirSync(dir).forEach(f => {
-      const stat = fs.statSync(path.join(dir, f))
-      if (stat.isFile()) total += stat.size
-    })
+    for (const f of fs.readdirSync(dir)) {
+      const st = fs.statSync(path.join(dir, f))
+      if (st.isFile()) total += st.size
+    }
   } catch (e) { /* dir may not exist */ }
   return total
+}
+
+const mb = bytes => (bytes / 1024 / 1024).toFixed(1) + ' MB'
+
+// Collect every exerciseId referenced by data/workouts/*.json
+function idsUsedByWorkouts() {
+  const ids = new Set()
+  try {
+    for (const f of fs.readdirSync(WORKOUTS_DIR).filter(f => f.endsWith('.json'))) {
+      try {
+        const w = JSON.parse(fs.readFileSync(path.join(WORKOUTS_DIR, f), 'utf8'))
+        for (const e of (w.exercises || [])) if (e.exerciseId) ids.add(String(e.exerciseId))
+      } catch (e) { /* skip bad file */ }
+    }
+  } catch (e) { /* no workouts dir */ }
+  return ids
+}
+
+// Dataset names are lowercase and carry demo-model suffixes ("astride jumps
+// (male)"). Clean them once here so every screen shows the same label.
+const MINOR = new Set(['to', 'on', 'with', 'and', 'the', 'a', 'of', 'in', 'up', 'v'])
+
+function cleanName(raw) {
+  return String(raw)
+    .replace(/\s*\((male|female)\)\s*$/i, '')
+    .trim()
+    .split(' ')
+    .map((w, i) => {
+      const bare = w.replace(/[^a-z]/gi, '').toLowerCase()
+      if (i > 0 && MINOR.has(bare)) return w.toLowerCase()
+      return w.charAt(0).toUpperCase() + w.slice(1)
+    })
+    .join(' ')
+}
+
+// ── Normalize a dataset record to the MirrorOS exercise schema ──
+// Frontend + server expect: id, name, bodyPart, target, equipment,
+// secondaryMuscles[], instructions[] — keep those names stable.
+function normalize(rec) {
+  const steps = (rec.instruction_steps || {})
+  const en = Array.isArray(steps.en) ? steps.en : []
+  const hi = Array.isArray(steps.hi) ? steps.hi : []
+
+  return {
+    id:               rec.id,
+    name:             cleanName(rec.name),
+    searchName:       String(rec.name).toLowerCase(),
+    bodyPart:         rec.body_part || rec.category || 'full body',
+    target:           rec.target || rec.muscle_group || 'full body',
+    equipment:        rec.equipment || 'body weight',
+    muscleGroup:      rec.muscle_group || '',
+    secondaryMuscles: Array.isArray(rec.secondary_muscles) ? rec.secondary_muscles : [],
+    instructions:     en,
+    instructionsHi:   hi,
+    mediaId:          rec.media_id || '',
+    // Media is stored by plain id so the UI can build paths without a lookup.
+    localGif:         '/data/gifs/' + rec.id + '.gif',
+    thumb:            '/data/thumbs/' + rec.id + '.jpg',
+    gifUrl:           '',
+    attribution:      rec.attribution || ''
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────
 
 async function main() {
-  console.log('\n🏋️  MirrorOS Fitness Setup\n')
+  console.log('\n🏋️  MirrorOS Fitness Setup — open exercises dataset\n')
 
-  // 1. Check API key
-  if (!API_KEY) {
-    console.log('❌ EXERCISEDB_API_KEY not found in .env\n')
-    console.log('   1. Go to: rapidapi.com/justin-WFnsXH_t6/api/exercisedb')
-    console.log('   2. Subscribe to the free plan (100 requests/month)')
-    console.log('   3. Copy your API key')
-    console.log('   4. Add to .env:  EXERCISEDB_API_KEY=your_key_here')
-    console.log('   5. Run again:    npm run setup:fitness\n')
-    process.exit(1)
+  // 1. Metadata
+  console.log('Fetching dataset metadata (~17 MB)...')
+  const raw = await downloadBinary(`${RAW_BASE}/data/exercises.json`)
+  let dataset
+  try {
+    dataset = JSON.parse(raw.toString('utf8'))
+  } catch (e) {
+    throw new Error('dataset JSON did not parse: ' + e.message)
+  }
+  if (!Array.isArray(dataset) || !dataset.length) throw new Error('dataset was empty')
+
+  const exercises = dataset
+    .filter(r => r && r.id && r.name)
+    .map(normalize)
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+  fs.writeFileSync(EXERCISES_PATH, JSON.stringify(exercises, null, 2))
+
+  const withHindi = exercises.filter(e => e.instructionsHi.length).length
+  console.log(`✓ Wrote ${exercises.length} exercises → data/exercises.json (${mb(fs.statSync(EXERCISES_PATH).size)})`)
+  console.log(`  ${withHindi} have Hindi instructions`)
+  console.log(`  body parts: ${[...new Set(exercises.map(e => e.bodyPart))].join(', ')}`)
+  console.log(`  equipment:  ${new Set(exercises.map(e => e.equipment)).size} kinds\n`)
+
+  if (NO_MEDIA) {
+    console.log('--no-media set — skipping GIF/thumbnail download.')
+    console.log('The mirror will lazily fetch each GIF on first use instead.\n')
+    return
   }
 
-  // Ensure directories exist
+  // 2. Pick which media to fetch
+  let targets = exercises
+  if (ONLY_IDS) {
+    const want = new Set(ONLY_IDS)
+    targets = exercises.filter(e => want.has(e.id))
+    console.log(`--only set — fetching media for ${targets.length} of ${ONLY_IDS.length} requested ids\n`)
+  } else if (USED_ONLY) {
+    const used = idsUsedByWorkouts()
+    targets = exercises.filter(e => used.has(e.id))
+    console.log(`--used set — fetching media for the ${targets.length} ids referenced by data/workouts/\n`)
+  }
+
+  if (!targets.length) {
+    console.log('No matching exercises to fetch media for.\n')
+    return
+  }
+
+  // 3. Thumbnails (small — always worth having for the companion browser)
+  fs.mkdirSync(THUMBS_DIR, { recursive: true })
+  console.log(`Downloading ${targets.length} thumbnails (180x180 JPEG, ~6 KB each)...`)
+  await pool(targets, async ex => {
+    const dest = path.join(THUMBS_DIR, ex.id + '.jpg')
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return 'skip'
+    const buf = await downloadBinary(`${RAW_BASE}/images/${ex.id}-${ex.mediaId}.jpg`)
+    fs.writeFileSync(dest, buf)
+  }, 'thumbs')
+
+  if (THUMBS_ONLY) {
+    console.log('\n--thumbs set — skipping GIFs.')
+    console.log(`data/thumbs: ${mb(dirSize(THUMBS_DIR))}\n`)
+    return
+  }
+
+  // 4. GIFs
   fs.mkdirSync(GIFS_DIR, { recursive: true })
+  console.log(`\nDownloading ${targets.length} animation GIFs (180x180, ~90 KB each)...`)
+  const res = await pool(targets, async ex => {
+    const dest = path.join(GIFS_DIR, ex.id + '.gif')
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return 'skip'
+    const buf = await downloadBinary(`${RAW_BASE}/videos/${ex.id}-${ex.mediaId}.gif`)
+    fs.writeFileSync(dest, buf)
+  }, 'gifs')
 
-  // 2. Check if data already exists
-  let exercises = null
-  let skipFetch = false
-
-  if (fs.existsSync(EXERCISES_PATH)) {
-    try {
-      exercises = JSON.parse(fs.readFileSync(EXERCISES_PATH, 'utf8'))
-      const answer = await ask(`Exercise data already exists (${exercises.length} exercises). Re-download? (y/n) `)
-      if (answer !== 'y' && answer !== 'yes') {
-        console.log('Skipping download, using existing data.\n')
-        skipFetch = true
-      }
-    } catch (e) {
-      console.log('Existing exercises.json is corrupt, re-downloading.\n')
-    }
+  console.log('\n── Done ────────────────────────────────')
+  console.log(`  exercises:   ${exercises.length}`)
+  console.log(`  gifs:        ${fs.readdirSync(GIFS_DIR).filter(f => f.endsWith('.gif')).length}  (${mb(dirSize(GIFS_DIR))})`)
+  console.log(`  thumbs:      ${fs.readdirSync(THUMBS_DIR).filter(f => f.endsWith('.jpg')).length}  (${mb(dirSize(THUMBS_DIR))})`)
+  if (res.failed) {
+    console.log(`\n  ⚠ ${res.failed} GIFs failed — the mirror will retry them lazily on first use.`)
+    console.log('    Re-run this script to fill the gaps (already-downloaded files are skipped).')
   }
-
-  // 3-6. Fetch exercises
-  if (!skipFetch) {
-    console.log('Fetching exercises from ExerciseDB...\n')
-
-    const allRaw = []
-
-    const fetchEndpoints = async (list, type) => {
-      for (const seg of list) {
-        const endpoint = `/exercises/${type}/${seg}?limit=100`
-        try {
-          const data = await apiFetch(endpoint)
-          if (Array.isArray(data)) {
-            allRaw.push(...data)
-            console.log(`    ✓ ${seg.replace('%20', ' ')}: ${data.length} exercises`)
-          } else {
-            console.log(`    ⚠ Unexpected response for ${seg}:`, JSON.stringify(data).slice(0, 80))
-          }
-        } catch (err) {
-          console.error(`    ❌ ${seg}: ${err.message}`)
-        }
-        await sleep(600)
-      }
-    }
-
-    console.log('── bodyPart endpoints ──')
-    await fetchEndpoints(BODY_PART_ENDPOINTS, 'bodyPart')
-    console.log('\n── equipment endpoints ──')
-    await fetchEndpoints(EQUIPMENT_ENDPOINTS, 'equipment')
-
-    // 4. Deduplicate by id
-    const seen = new Set()
-    const deduped = []
-    for (const ex of allRaw) {
-      if (!ex.id || seen.has(ex.id)) continue
-      seen.add(ex.id)
-      deduped.push(ex)
-    }
-    console.log(`\nTotal unique exercises: ${deduped.length}`)
-
-    // Filter to home-friendly equipment
-    const filtered = deduped.filter(ex => ALLOWED_EQUIPMENT.has(ex.equipment))
-    console.log(`After equipment filter: ${filtered.length}`)
-
-    // 5. Normalise
-    exercises = filtered.map(ex => ({
-      id:               ex.id,
-      name:             ex.name,
-      bodyPart:         ex.bodyPart,
-      target:           ex.target,
-      equipment:        ex.equipment,
-      secondaryMuscles: ex.secondaryMuscles || [],
-      instructions:     ex.instructions || [],
-      gifUrl:           ex.gifUrl || '',
-      localGif:         '/data/gifs/' + ex.id + '.gif'
-    }))
-
-    // 6. Save
-    fs.writeFileSync(EXERCISES_PATH, JSON.stringify(exercises, null, 2))
-    console.log(`\nSaved ${exercises.length} exercises to data/exercises.json`)
-  }
-
-  // 7. Download GIFs
-  if (exercises && exercises.length > 0) {
-    // Ensure gifs dir exists
-    fs.mkdirSync(GIFS_DIR, { recursive: true })
-
-    const withGif    = exercises.filter(ex => ex.gifUrl && ex.gifUrl.startsWith('http'))
-    const missingUrl = exercises.length - withGif.length
-    console.log(`\nDownloading GIFs (${withGif.length} have URL, ${missingUrl} have no URL)...\n`)
-
-    if (missingUrl > 0) {
-      console.log(`  ⚠ ${missingUrl} exercises have no gifUrl — these will be skipped`)
-    }
-
-    let downloaded = 0
-    let skipped    = 0
-    let failed     = 0
-    let noUrl      = missingUrl
-    let firstError = null
-
-    // Download one at a time to avoid overwhelming the CDN
-    for (let i = 0; i < withGif.length; i++) {
-      const ex      = withGif[i]
-      const gifPath = path.join(GIFS_DIR, ex.id + '.gif')
-
-      if (fs.existsSync(gifPath) && fs.statSync(gifPath).size > 0) {
-        skipped++
-        process.stdout.write(`\r  ${i + 1}/${withGif.length} — skipped ${skipped}, downloaded ${downloaded}, failed ${failed}`)
-        continue
-      }
-
-      try {
-        const buffer = await downloadBinary(ex.gifUrl)
-        fs.writeFileSync(gifPath, buffer)
-        downloaded++
-      } catch (err) {
-        if (!firstError) firstError = `${ex.id} (${ex.gifUrl}): ${err.message}`
-        failed++
-      }
-
-      process.stdout.write(`\r  ${i + 1}/${withGif.length} — skipped ${skipped}, downloaded ${downloaded}, failed ${failed}`)
-      await sleep(50) // small delay to avoid CDN rate limit
-    }
-
-    console.log(`\n\n  Downloaded:            ${downloaded}`)
-    console.log(`  Skipped (already had): ${skipped}`)
-    console.log(`  No gifUrl:             ${noUrl}`)
-    console.log(`  Failed:                ${failed}`)
-    if (firstError) console.log(`  First error: ${firstError}`)
-  }
-
-  // 8. Summary
-  const exerciseCount = exercises ? exercises.length : 0
-  const gifCount = fs.existsSync(GIFS_DIR)
-    ? fs.readdirSync(GIFS_DIR).filter(f => f.endsWith('.gif')).length
-    : 0
-  const storageMB = ((dirSize(GIFS_DIR) + (fs.existsSync(EXERCISES_PATH) ? fs.statSync(EXERCISES_PATH).size : 0)) / 1024 / 1024).toFixed(1)
-
-  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('✅ Fitness data ready!')
-  console.log(`   Exercises saved:  ${exerciseCount}`)
-  console.log(`   GIFs downloaded:  ${gifCount}`)
-  console.log(`   Storage used:     ~${storageMB} MB`)
-  console.log('   Run: node server/index.js to start MirrorOS')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+  console.log('\nMedia © Gym visual — https://gymvisual.com/ (cached locally, do not redistribute)\n')
 }
 
 main().catch(err => {

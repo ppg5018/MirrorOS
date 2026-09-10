@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const functions = require('./functions')
+const WorkoutEngine = require('../fitness/workout-engine')
 
 // Verbose per-query tracing (full history/message JSON dumps) is expensive on a
 // Pi and only useful while debugging. Off unless DEBUG_AI=1.
@@ -63,7 +64,14 @@ FITNESS RULES:
 - "pause workout" / "hold on"                                  → fitness_control action: pause
 - "resume workout" / "continue" / "keep going"                 → fitness_control action: resume
 - "skip exercise" / "next exercise"                            → fitness_control action: skip
-- "stop workout" / "end workout" / "I'm done"                  → fitness_control action: stop
+- "next set" / "next" / "skip" / "next one" / "done with this set" / "aage badho"
+  → fitness_control action: skip  (ONLY when a workout is in progress — the
+    message will carry a [Workout in progress: ...] note. skip advances one set
+    at a time and rolls into the next exercise after the last set, so it is the
+    correct action for "next set" as well as "next exercise". Never ask the user
+    to clarify between song/photo/exercise while that note is present.)
+- "stop workout" / "end workout" / "I'm done" / bare "done"     → fitness_control action: stop
+  (bare "done"/"finished" ends the WORKOUT. Only "done with this set" / "set done" is a skip.)
 - "workout status" / "how am I doing" / "how many calories"    → fitness_control action: status
 - "show me workouts" / "what workouts do you have"             → fitness_control action: list_workouts
 - Workout IDs: hiit-circuit, upper-body, lower-body, core-crusher, full-body-burn, morning-yoga, stretching, 5-minute-quickie
@@ -183,12 +191,40 @@ function getHistory() {
 // Builds the messages array for the first Claude call.
 // If there was a recent tool action, inject it explicitly into the user message
 // so Claude knows exactly what "that" / "it" refers to — no guessing needed.
+// A workout is a modal, hands-busy context: mid-set the user says "next" or
+// "next set", not "next exercise in my workout". Without knowing a workout is
+// running, Claude cannot tell that from "next song"/"next photo" and asks a
+// clarifying question the user cannot easily answer mid-burpee. Surfacing the
+// live state resolves the reference the same way lastToolContext does.
+// Never let a failure here break a voice query — the mirror must keep answering.
+function workoutContext() {
+  try {
+    const engine = WorkoutEngine.getInstance()
+    if (!engine) return null
+    const s = engine.getState()
+    if (!s || ['idle', 'complete'].includes(s.state)) return null
+
+    const name = s.currentExercise?.name || s.currentExercise?.exerciseId || 'exercise'
+    const sets = s.currentExercise?.sets || 1
+    return ' [Workout in progress: "' + s.workoutName + '", ' + s.state +
+      ', exercise ' + (s.currentExerciseIndex + 1) + '/' + s.totalExercises +
+      ' (' + name + '), set ' + s.currentSet + '/' + sets +
+      '. Bare commands like "next", "next set", "skip", "pause", "done" refer to' +
+      ' THIS workout — call fitness_control, do not ask which thing they mean.]'
+  } catch (err) {
+    dbg('workoutContext failed:', err.message)
+    return null
+  }
+}
+
 function buildMessages(userText) {
   let enrichedText = userText
+  const workout = workoutContext()
+  if (workout) enrichedText += workout
   if (lastToolContext) {
     const ctx = lastToolContext
     enrichedText =
-      userText +
+      enrichedText +
       ' [Context: just executed ' + ctx.toolName +
       ' with ' + JSON.stringify(ctx.toolInput) +
       ', result: ' + ctx.toolResult + ']'

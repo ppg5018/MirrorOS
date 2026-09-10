@@ -11,8 +11,9 @@ Sarvam config (env / .env):
   SARVAM_STT_MODEL   default: saarika:v2.5
   SARVAM_STT_LANG    default: en-IN   (use 'unknown' to auto-detect Hindi etc.)
 
-Whisper language (fallback only):
-  WHISPER_LANG=en / hi / unset (auto-detect)
+Whisper (fallback only):
+  WHISPER_LANG=en / hi / unset or empty (auto-detect)
+  WHISPER_MODEL=tiny / base   default: base  ('tiny' is much faster on a Pi 4)
 
 Usage: python3 transcribe.py /tmp/voice_input.wav
 Output: transcribed text on stdout (single line, no trailing newline)
@@ -41,7 +42,20 @@ def _load_env():
                     os.environ.setdefault(k.strip(), v.strip())
 _load_env()
 
-LANGUAGE     = os.environ.get('WHISPER_LANG', None)  # None = auto-detect
+def _env(name, default=None):
+    """os.environ.get, but an empty/whitespace value counts as unset.
+
+    PM2 passes `WHISPER_LANG: ''` from ecosystem.config.js, and a plain
+    os.environ.get(..., None) hands Whisper language='' -> it raises
+    `ValueError: Unsupported language:` and the whole offline STT path dies.
+    """
+    v = os.environ.get(name)
+    v = v.strip() if isinstance(v, str) else v
+    return v if v else default
+
+
+LANGUAGE     = _env('WHISPER_LANG')                  # None = auto-detect
+WHISPER_SIZE = _env('WHISPER_MODEL', 'base')         # 'tiny' is much faster on a Pi
 SARVAM_URL   = 'https://api.sarvam.ai/speech-to-text'
 
 
@@ -58,7 +72,7 @@ def transcribe_sarvam(wav_path):
     """Transcribe via Sarvam Saarika.
     Returns the transcript string on success (may be ''), or None on failure
     (so the caller can fall back to Whisper)."""
-    key = os.environ.get('SARVAM_API_KEY')
+    key = _env('SARVAM_API_KEY')
     if not key:
         return None
 
@@ -71,8 +85,8 @@ def transcribe_sarvam(wav_path):
                 headers={'api-subscription-key': key},
                 files={'file': ('audio.wav', f, 'audio/wav')},
                 data={
-                    'model': os.environ.get('SARVAM_STT_MODEL', 'saarika:v2.5'),
-                    'language_code': os.environ.get('SARVAM_STT_LANG', 'en-IN'),
+                    'model': _env('SARVAM_STT_MODEL', 'saarika:v2.5'),
+                    'language_code': _env('SARVAM_STT_LANG', 'en-IN'),
                 },
                 timeout=30
             )
@@ -110,7 +124,7 @@ def transcribe_whisper(wav_path):
     import whisper
 
     boost_audio(wav_path)
-    model = whisper.load_model('base')
+    model = whisper.load_model(WHISPER_SIZE)
 
     result = model.transcribe(
         wav_path,
@@ -140,15 +154,22 @@ def transcribe(wav_path):
         return ''
 
     # 1. Sarvam (if configured). None => failed, fall back to Whisper.
-    if os.environ.get('SARVAM_API_KEY'):
+    if _env('SARVAM_API_KEY'):
         text = transcribe_sarvam(wav_path)
         if text is not None:
             return _clean(text)
         print('[transcribe] Sarvam failed — falling back to Whisper',
               file=sys.stderr)
 
-    # 2. Whisper fallback
-    return _clean(transcribe_whisper(wav_path))
+    # 2. Whisper fallback. A crash here (bad WHISPER_LANG, missing model
+    #    download, OOM on the Pi) must surface as "no transcript", not a
+    #    traceback that leaves wakeword.py parsing stderr as the user's words.
+    try:
+        return _clean(transcribe_whisper(wav_path))
+    except Exception as e:
+        print(f'[transcribe] Whisper failed: {type(e).__name__}: {e}',
+              file=sys.stderr)
+        return ''
 
 
 if __name__ == '__main__':

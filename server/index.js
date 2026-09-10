@@ -170,22 +170,18 @@ app.use('/api/setup',      require('./routes/setup'))
 // Serve uploaded photos as static files
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads'), { maxAge: '1d' }))
 
-// Serve fitness GIFs as static files (immutable media — cache aggressively)
-app.use('/data/gifs', express.static(path.join(__dirname, '../data/gifs'), { maxAge: '7d', immutable: true }))
+// Serve fitness GIFs + thumbnails as static files (immutable media — cache
+// aggressively). The media-cache handlers run only on a static miss and pull
+// the single missing file from the exercises dataset, so an interrupted
+// `npm run setup:fitness` never leaves a blank exercise panel mid-workout.
+const fitnessMedia = require('./fitness/media-cache')
+app.use('/data/gifs',   express.static(path.join(__dirname, '../data/gifs'),   { maxAge: '7d', immutable: true }))
+app.get('/data/gifs/:id.gif', fitnessMedia.gifHandler)
+app.use('/data/thumbs', express.static(path.join(__dirname, '../data/thumbs'), { maxAge: '7d', immutable: true }))
+app.get('/data/thumbs/:id.jpg', fitnessMedia.thumbHandler)
 
 // Serve screensaver videos and thumbnails
 app.use('/screensaver', express.static(path.join(__dirname, '../public/screensaver'), { maxAge: '7d' }))
-
-// Spotify token endpoint for Web Playback SDK
-app.get('/spotify/token', async (req, res) => {
-  try {
-    const { getValidToken } = require('./helpers/spotify-auth')
-    const token = await getValidToken()
-    res.json({ token, connected: !!token })
-  } catch (err) {
-    res.json({ token: null, connected: false, error: err.message })
-  }
-})
 
 // PIR motion sensor event from pir.py
 app.post('/api/sensors/motion', (req, res) => {

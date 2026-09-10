@@ -9,22 +9,14 @@
   "exercises": [
     {
       "exerciseId": "3220",
-      "name": "Jumping Jack",
-      "target": "full body",
-      "secondaryMuscles": ["shoulders", "calves", "core"],
-      "instructions": ["Stand with feet together and arms at sides", "Jump feet apart while raising arms overhead", "Jump back to starting position", "Maintain a steady rhythm throughout"],
       "sets": 1,
       "reps": 30,
       "restSeconds": 10,
       "formTip": "Full range, arms overhead on each jump",
-      "metValue": 7.0
+      "metValue": 7
     },
     {
       "exerciseId": "0662",
-      "name": "Push Up",
-      "target": "chest",
-      "secondaryMuscles": ["triceps", "shoulders", "core"],
-      "instructions": ["Start in high plank with hands shoulder-width apart", "Lower your chest toward the floor", "Push back up to starting position explosively", "Keep body in a straight line throughout"],
       "sets": 1,
       "reps": 10,
       "restSeconds": 10,
@@ -32,11 +24,7 @@
       "metValue": 5.5
     },
     {
-      "exerciseId": "0032",
-      "name": "Bodyweight Squat",
-      "target": "quads",
-      "secondaryMuscles": ["glutes", "hamstrings"],
-      "instructions": ["Stand with feet shoulder-width apart", "Lower your body by bending knees and hips", "Keep chest up and core engaged", "Push through heels to return to standing"],
+      "exerciseId": "1685",
       "sets": 1,
       "reps": 15,
       "restSeconds": 10,
@@ -44,16 +32,12 @@
       "metValue": 5.5
     },
     {
-      "exerciseId": "1472",
-      "name": "Plank",
-      "target": "core",
-      "secondaryMuscles": ["shoulders", "glutes", "quads"],
-      "instructions": ["Place forearms on the ground with elbows under shoulders", "Extend legs back and rise onto your toes", "Keep body in a straight line from head to heels", "Hold position while breathing steadily"],
+      "exerciseId": "0464",
       "sets": 1,
       "reps": 30,
       "restSeconds": 0,
       "formTip": "Strong plank to finish — do not quit!",
-      "metValue": 5.0
+      "metValue": 5
     }
   ]
 }

@@ -9,10 +9,16 @@ const WORKOUTS_DIR   = path.join(__dirname, '../../data/workouts')
 const WARMUP_SECONDS = 15
 const SECONDS_PER_REP = 3
 
+// Module-level handle to the live engine. server/ai/claude.js needs to know
+// whether a workout is running so it can resolve bare mid-workout commands
+// ("next", "next set", "skip"), and it has no access to the Express app.
+let _instance = null
+
 class WorkoutEngine {
   constructor(io) {
     this.io = io
     this._reset()
+    _instance = this
   }
 
   _reset() {
@@ -333,5 +339,8 @@ class WorkoutEngine {
     if (this.io) this.io.emit(event, data)
   }
 }
+
+// Returns the live engine, or null before index.js constructs it.
+WorkoutEngine.getInstance = () => _instance
 
 module.exports = WorkoutEngine

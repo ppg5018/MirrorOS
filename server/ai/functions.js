@@ -36,9 +36,19 @@ function normalizeWidget(name) {
 // Tracks the last volume we set so "louder"/"quieter" can step relative to it.
 let lastVolume = 50
 
+// Attach the route's error message and code so tools can speak a useful reason
+// instead of a bare status number.
+async function httpError(res, method, path) {
+  const body = await res.json().catch(() => ({}))
+  const err  = new Error(body.error || `${method} ${path} returned ${res.status}`)
+  err.status = res.status
+  err.code   = body.code || null
+  return err
+}
+
 async function get(path) {
   const res = await fetch(`${BASE}${path}`)
-  if (!res.ok) throw new Error(`GET ${path} returned ${res.status}`)
+  if (!res.ok) throw await httpError(res, 'GET', path)
   return res.json()
 }
 
@@ -48,8 +58,27 @@ async function post(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  if (!res.ok) throw new Error(`POST ${path} returned ${res.status}`)
+  if (!res.ok) throw await httpError(res, 'POST', path)
   return res.json()
+}
+
+// Start playback on Mira's own Connect speaker. Returns null on success, or a
+// spoken message explaining why it failed.
+// NOTE: the 'spotify-play' socket event only nudges open dashboards to refresh
+// their now-playing widget — it does NOT start playback. Every play path must
+// POST /api/spotify/play, or nothing is heard.
+async function playOnMira(uri, io) {
+  try {
+    await post('/api/spotify/play', { uri })
+    if (io) io.emit('spotify-play', { uri })
+    return null
+  } catch (e) {
+    if (e.code === 'no_target_device') {
+      return "Mira's speaker isn't connected to Spotify right now, so I can't play it here."
+    }
+    console.error('[play_music] playback failed:', e.message)
+    return "Spotify wouldn't start playback just now."
+  }
 }
 
 const functions = {
@@ -243,7 +272,8 @@ const functions = {
           t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
         ) || tracks[0]
       }
-      if (io) io.emit('spotify-play', { uri: pick.uri })
+      const failed = await playOnMira(pick.uri, io)
+      if (failed) return { success: false, message: failed }
       return { success: true, message: 'Playing ' + pick.title + ' by ' + pick.artist + '.' }
     }
 
@@ -252,7 +282,8 @@ const functions = {
       const tracks = data.tracks || []
       if (!tracks.length) return { success: false, message: 'No liked songs found.' }
       const pick = tracks[Math.floor(Math.random() * Math.min(tracks.length, 10))]
-      if (io) io.emit('spotify-play', { uri: pick.uri })
+      const failed = await playOnMira(pick.uri, io)
+      if (failed) return { success: false, message: failed }
       return { success: true, message: 'Playing ' + pick.title + ' from your liked songs.' }
     }
 
@@ -261,7 +292,8 @@ const functions = {
       const tracks = data.tracks || []
       if (!tracks.length) return { success: false, message: 'No top tracks found. Try searching for a song.' }
       const pick = tracks[0]
-      if (io) io.emit('spotify-play', { uri: pick.uri })
+      const failed = await playOnMira(pick.uri, io)
+      if (failed) return { success: false, message: failed }
       return { success: true, message: 'Playing ' + pick.title + ', one of your most played tracks.' }
     }
 
@@ -271,7 +303,8 @@ const functions = {
       if (!playlists.length) return { success: false, message: 'No playlists found.' }
       const q     = (query || '').toLowerCase()
       const match = playlists.find(p => p.name.toLowerCase().includes(q)) || playlists[0]
-      if (io) io.emit('spotify-play', { uri: match.uri })
+      const failed = await playOnMira(match.uri, io)
+      if (failed) return { success: false, message: failed }
       return { success: true, message: 'Playing your ' + match.name + ' playlist.' }
     }
 
@@ -280,18 +313,11 @@ const functions = {
     const results = await get('/api/spotify/search?q=' + encodeURIComponent(query))
     if (!results.length) return { success: false, message: 'Could not find "' + query + '" on Spotify.' }
     const top = results[0]
-    // Start playback server-side (targets the Mira Connect device, else whatever
-    // device is active). Works headless — no browser/SDK needed.
-    try {
-      await post('/api/spotify/play', { uri: top.uri })
-      if (io) io.emit('spotify-play', { uri: top.uri })  // refresh any open dashboard
-      return { success: true, message: 'Playing ' + top.title + ' by ' + top.artist + ' on Spotify.' }
-    } catch (e) {
-      return {
-        success: false,
-        message: 'Found ' + top.title + ', but no Spotify speaker is active. Open Spotify on a device (or start Mira) and try again.'
-      }
-    }
+    // Start playback server-side on Mira's Connect device. Works headless —
+    // no browser/SDK needed.
+    const failed = await playOnMira(top.uri, io)
+    if (failed) return { success: false, message: 'Found ' + top.title + ', but ' + failed }
+    return { success: true, message: 'Playing ' + top.title + ' by ' + top.artist + ' on Spotify.' }
   },
 
   set_reminder: async (input, _io) => {
@@ -493,11 +519,11 @@ const functions = {
       const results = await get('/api/spotify/search?q=' + encodeURIComponent(input.query))
       if (!results.length) return { success: false, message: `Could not find "${input.query}" on Spotify.` }
       const top = results[0]
-      // Start playback via REST API (reliable — doesn't need SDK active device)
-      await post('/api/spotify/play', { uri: top.uri }).catch(() => {
-        // Fallback to Web Playback SDK if REST fails
-        if (io) io.emit('spotify-play', { uri: top.uri })
-      })
+      // Karaoke without audio is pointless, so don't open the page if the
+      // mirror's speaker can't play. (The old Web Playback SDK fallback here
+      // was dead code — the SDK was removed.)
+      const failed = await playOnMira(top.uri, io)
+      if (failed) return { success: false, message: failed }
       // Navigate to karaoke page after Spotify has a moment to start
       const track = {
         name:        top.title,
