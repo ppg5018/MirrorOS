@@ -76,7 +76,7 @@ OTA       →  GitHub repo + nightly git pull at 2am via cron
 ## File Structure
 
 ```
-mirroros/
+MirrorOs/                      ← on the Pi: /home/mira/Desktop/MirrorOs
 ├── public/
 │   ├── index.html             ← Main mirror UI (served in Chromium kiosk)
 │   ├── css/mirror.css         ← All styles, CSS variables

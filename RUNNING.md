@@ -6,6 +6,16 @@
 - Python 3 (for voice features)
 - A `.env` file in the project root (already present)
 
+## Project location
+
+On the Raspberry Pi the project lives at `~/Desktop/MirrorOs` (lowercase "s" — Linux paths are case-sensitive):
+
+```bash
+cd ~/Desktop/MirrorOs
+```
+
+Run every command below from that folder.
+
 ## Install dependencies
 
 ```bash

@@ -59,7 +59,7 @@ module.exports = {
         WAKE_THRESHOLD:   '0.35',   // raise toward 0.5 if you get false triggers
         WAKE_COOLDOWN:    '1.5',    // deaf period after replying, so the mirror
                                     // does not hear its own voice and answer itself
-        // WAKE_WORD_PATH: '/home/mirroros/mirroros/server/voice/wakewords/hey-mirror.onnx',
+        // WAKE_WORD_PATH: '/home/mira/Desktop/MirrorOs/server/voice/wakewords/hey-mirror.onnx',
         // WAKE_FRAMEWORK: 'tflite', // lighter than onnxruntime on a Pi
         // WAKE_DEBUG:     '1',      // log mic level + score every ~2s
 

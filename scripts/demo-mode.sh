@@ -1,4 +1,7 @@
 #!/bin/bash
+# Run from the project folder (on the Pi: /home/mira/Desktop/MirrorOs) no matter
+# where this script is called from.
+cd "$(dirname "$0")/.."
 echo "=== MirrorOS Demo Mode ==="
 
 # Make sure all processes are running

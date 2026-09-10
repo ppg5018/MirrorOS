@@ -4,6 +4,9 @@
 # Usage: bash scripts/test-voice.sh
 
 set -e
+# Run from the project folder (on the Pi: /home/mira/Desktop/MirrorOs) no matter
+# where this script is called from — the steps below use relative paths.
+cd "$(dirname "$0")/.."
 BACKEND="http://localhost:3000"
 
 echo "=== MirrorOS Voice Pipeline Test ==="

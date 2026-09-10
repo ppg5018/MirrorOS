@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+# Run from the project folder (on the Pi: /home/mira/Desktop/MirrorOs) no matter
+# where this script is called from — ecosystem.config.js is loaded by relative path.
+cd "$(dirname "$0")/.."
 echo "=== MirrorOS PM2 Setup ==="
 
 # Create log directory

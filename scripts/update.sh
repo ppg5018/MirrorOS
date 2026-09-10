@@ -1,9 +1,11 @@
 #!/bin/bash
 # MirrorOS OTA Update Script
-# Runs nightly at 2am via cron: 0 2 * * * /home/$(whoami)/mirroros/scripts/update.sh
+# Runs nightly at 2am via cron: 0 2 * * * /home/mira/Desktop/MirrorOs/scripts/update.sh
+# (scripts/setup-cron.sh installs that line with the right path for you)
 
 LOG="/var/log/mirroros/updates.log"
-DIR="/home/$(whoami)/mirroros"
+# The project folder is wherever this script lives — no hardcoded path to go stale.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$(dirname $LOG)"
 echo "$(date): Starting update..." >> $LOG

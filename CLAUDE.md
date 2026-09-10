@@ -55,7 +55,7 @@ The `open` npm package is ESM-only (v11) — use `await import('open')`, never `
 ## Project Structure
 
 ```
-MirrorOS/
+MirrorOS/                         ← on the Pi: /home/mira/Desktop/MirrorOs (lowercase "s"; Linux paths are case-sensitive)
 ├── server/
 │   ├── index.js                  ← Express app, Socket.io, auth wiring, route registration, boot sequence
 │   ├── logger.js                 ← pino logger + request middleware
@@ -519,7 +519,10 @@ Or use the phone wizard at `/setup`. Spotify tokens auto-refresh within 2 min of
 
 ## Running & Deployment
 
+On the Pi (user `mira`) the project lives at **`/home/mira/Desktop/MirrorOs`** — note the lowercase "s". Scripts in `scripts/` locate the project from their own path (`$(dirname "$0")/..`), so never hardcode a project path in new scripts.
+
 ```bash
+cd ~/Desktop/MirrorOs
 npm start          # or: npm run dev — node server/index.js
 npm run pm2:start  # start all three PM2 processes (ecosystem.config.js)
 npm run pm2:logs   # tail logs

@@ -4,6 +4,9 @@
 # Usage: bash scripts/setup-voice.sh
 
 set -e
+# Run from the project folder (on the Pi: /home/mira/Desktop/MirrorOs) no matter
+# where this script is called from — requirements.txt is loaded by relative path.
+cd "$(dirname "$0")/.."
 echo "=== MirrorOS Voice Setup ==="
 
 # ── System packages ─────────────────────────────────────────
