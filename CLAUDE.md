@@ -452,7 +452,7 @@ fetch('/api/backlight', { method: 'POST', ... }).catch(() => {})
 ```
 
 ### Viewport scaling
-`main.js` applies `document.documentElement.style.zoom` to scale the 1920×1080 design to any screen. Overlays/modals that must be true fullscreen use `position: fixed` — they are scaled correctly by the zoom.
+The dashboard is **portrait** (810×1440 canvas) on a monitor that is physically turned on its side while the Pi still outputs landscape. `main.js` applies one `transform` (translate + rotate + scale) to `<body>` to fit and rotate the canvas. Rotation comes from `?rotate=90|-90|0` (saved in `localStorage` as `mira_rotate`; default `90` = content turned clockwise). Because body is transformed, it is the containing block for `position: fixed` overlays — size them to the 810×1440 canvas, not `100vw/100vh`.
 
 ---
 

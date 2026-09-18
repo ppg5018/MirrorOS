@@ -163,11 +163,9 @@ function wireAlarmButtons() {
     })
   }
 
-  // Stop: listen on the document, NOT the overlay. main.js applies
-  // document.documentElement.style.zoom, and under root CSS zoom a fixed
-  // overlay's clickable area is offset from where it paints — so a click on
-  // the visible overlay may never reach the overlay element. A document-level
-  // listener still fires because the click lands on *some* element and bubbles.
+  // Stop: listen on the document, NOT the overlay. main.js scales/rotates the
+  // page with a transform on <body>; a document-level listener fires no
+  // matter which element the (transformed) click lands on.
   document.addEventListener('click', (e) => {
     if (!alarmIsRinging()) return
     if (snoozeBtn && snoozeBtn.contains(e.target)) return

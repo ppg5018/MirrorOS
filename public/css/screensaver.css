@@ -1,7 +1,7 @@
 #screensaver-overlay {
   position: fixed;
   top: 0; left: 0;
-  /* width/height set by JS to compensate for page zoom */
+  /* width/height set by JS to the 810×1440 canvas (body is the containing block) */
   background: #000;
   z-index: 9999;
   display: none;

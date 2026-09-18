@@ -20,144 +20,79 @@
     rel="stylesheet" />
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/mirror.css?v=mira-fillcols1" />
-  <link rel="stylesheet" href="css/screensaver.css" />
+  <link rel="stylesheet" href="css/mirror.css?v=mira-rotate1" />
+  <link rel="stylesheet" href="css/screensaver.css?v=mira-rotate1" />
 </head>
 
 <body class="state-idle">
 
-  <!-- ======================== MAIN GRID ======================== -->
+  <!-- ======================== PORTRAIT STACK ========================
+       Design canvas is 810×1440 (9:16); main.js zooms it to fill a portrait
+       screen. Order follows the Mira Dashboard design top → bottom. -->
   <div class="mira-root">
 
-    <!-- ════════ COL 1: Clock · Weather · Gallery · Music ════════ -->
-    <div class="mira-col mira-col-left">
-
-      <!-- Clock -->
-      <div class="clock-block" id="widget-clock">
-        <div class="clock-row">
-          <span id="clock-h">--</span><span class="clock-colon">:</span><span id="clock-m">--</span>
-          <span id="clock-ampm" class="clock-ampm">--</span>
-        </div>
-        <div class="clock-date" id="clock-date">--</div>
+    <!-- Clock · date · greeting -->
+    <div class="clock-block" id="widget-clock">
+      <div class="clock-row">
+        <span class="clock-digits"><span id="clock-h">--</span>:<span id="clock-m">--</span></span>
+        <span id="clock-ampm" class="clock-ampm">--</span>
       </div>
-
-      <!-- Weather -->
-      <div class="glass weather-card m-card-hover" id="widget-weather">
-        <div class="wx-top">
-          <div class="wx-main">
-            <span class="weather-icon msr wx-glyph">clear_day</span>
-            <div>
-              <div class="weather-temp">18°</div>
-              <div class="weather-condition">Clear · feels 16°</div>
-            </div>
-          </div>
-          <div class="wx-side wx-hilo">
-            <div class="wx-hi"><span class="msr">arrow_upward</span><span id="wx-high">24</span>°</div>
-            <div class="wx-lo"><span class="msr">arrow_downward</span><span id="wx-low">12</span>°</div>
-          </div>
-        </div>
-        <div class="wx-forecast" id="weather-forecast"></div>
-      </div>
-
-      <!-- Gallery -->
-      <div class="gallery-block" id="widget-gallery">
-        <div class="widget-label"><span class="msr">photo_library</span>Gallery</div>
-        <div class="gallery-frame" id="gallery-frame">
-          <div class="gallery-scrim"></div>
-        </div>
-        <div class="gallery-dots" id="gallery-dots"></div>
-      </div>
-
-      <!-- Now Playing -->
-      <div class="glass music-card m-card-hover">
-        <div class="now-playing-empty" id="now-playing-empty">Nothing playing</div>
-        <div id="widget-music" style="display:none">
-          <div class="music-inner">
-            <div id="music-art" class="music-art"><span class="music-note msr">music_note</span></div>
-            <div class="music-info">
-              <span id="music-source" class="music-source"></span>
-              <div id="music-title" class="music-title"></div>
-              <div id="music-artist" class="music-artist"></div>
-            </div>
-            <div class="music-controls">
-              <button class="music-btn" onclick="mediaCommand('prev')"><span class="msr">skip_previous</span></button>
-              <button class="music-btn music-btn-play" onclick="mediaCommand('toggle')"><span class="msr" id="music-play-glyph">pause</span></button>
-              <button class="music-btn" onclick="mediaCommand('next')"><span class="msr">skip_next</span></button>
-            </div>
-          </div>
-          <div class="music-bar-wrap">
-            <div id="music-bar-fill" class="music-bar-fill"></div>
-          </div>
-          <div class="music-time-row">
-            <span id="music-time-start" class="music-time">0:00</span>
-            <span id="music-time-end" class="music-time">0:00</span>
-          </div>
-          <div id="music-time" style="display:none"></div>
-        </div>
-      </div>
-
+      <div class="clock-date" id="clock-date">--</div>
+      <div class="ai-card-greeting greeting-main">Good morning, Arjun</div>
+      <div class="greeting-sub">Let's make it a good one</div>
     </div>
 
-    <!-- ════════ COL 2: Greeting · Orb · Quote ════════ -->
-    <div class="mira-col mira-col-center">
-
-      <div class="greeting-block">
-        <div class="ai-card-greeting greeting-main">Good morning, Arjun</div>
-        <div class="greeting-sub">Let's make it a good one</div>
-      </div>
-
-      <div class="center-bottom">
-        <!-- Ask Mira orb -->
-        <div class="orb-wrap ai-card" id="widget-ai-bar">
-          <div class="orb-panel" id="orb-panel">
-            <div class="ai-card-hint">Say <span>"Hey Mirror"</span> to begin.</div>
-            <div class="orb-input-row">
-              <input type="text" id="orb-input" class="orb-input" placeholder="Ask Mira anything…" autocomplete="off" />
-              <button class="orb-send" id="orb-send"><span class="msr">arrow_upward</span></button>
-            </div>
+    <!-- Weather -->
+    <div class="glass weather-card m-card-hover" id="widget-weather">
+      <div class="wx-top">
+        <div class="wx-main">
+          <span class="weather-icon msr wx-glyph">clear_day</span>
+          <div>
+            <div class="weather-temp">--°</div>
+            <div class="weather-condition"></div>
           </div>
-          <button class="orb-pill" id="orb-btn" aria-label="Ask Mira">
-            <span class="orb-mic"><span class="msr">mic</span></span>
-            <span class="orb-wave" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span>
-            </span>
-            <span class="orb-pill-label">Ask Mira</span>
-          </button>
         </div>
-
-        <!-- Quote -->
-        <div class="quote-block">
-          <div class="quote-serif">“<span id="quote-text">…</span>”</div>
-          <div class="quote-author-line"><span id="quote-author-name"></span></div>
+        <div class="wx-side wx-hilo">
+          <div class="wx-hi"><span class="msr">arrow_upward</span><span id="wx-high">--</span>°</div>
+          <div class="wx-lo"><span class="msr">arrow_downward</span><span id="wx-low">--</span>°</div>
         </div>
       </div>
-
+      <div class="wx-forecast" id="weather-forecast"></div>
     </div>
 
-    <!-- ════════ COL 3: Notifications · Today · Reminders · News ════════ -->
-    <div class="mira-col mira-col-right">
+    <!-- Today · Notifications -->
+    <div class="mira-pair">
+      <div class="glass today-card m-card-hover" id="widget-calendar">
+        <div class="widget-label"><span class="msr">calendar_today</span>Today</div>
+        <div class="schedule-widget" id="schedule-widget"></div>
+      </div>
 
-      <!-- Notifications -->
       <div class="glass notif-card m-card-hover" id="widget-notifications">
         <div class="widget-label label-row">
           <span><span class="msr">notifications</span>Notifications</span>
           <span class="notif-count" id="notif-count"></span>
         </div>
       </div>
+    </div>
 
-      <!-- Today (calendar) -->
-      <div class="glass today-card m-card-hover" id="widget-calendar">
-        <div class="widget-label"><span class="msr">calendar_today</span>Today</div>
-        <div class="schedule-widget" id="schedule-widget"></div>
+    <!-- Gallery -->
+    <div class="gallery-block" id="widget-gallery">
+      <div class="widget-label label-row">
+        <span><span class="msr">photo_library</span>Gallery</span>
+        <span class="gallery-dots" id="gallery-dots"></span>
       </div>
+      <div class="gallery-frame" id="gallery-frame">
+        <div class="gallery-scrim"></div>
+      </div>
+    </div>
 
-      <!-- Reminders (tasks) -->
+    <!-- Reminders · News -->
+    <div class="mira-pair">
       <div class="glass reminders-card m-card-hover" id="widget-tasks">
         <div class="widget-label"><span class="msr">task_alt</span>Reminders</div>
         <div class="tasks-list" id="tasks-list"></div>
       </div>
 
-      <!-- News -->
       <div class="glass news-card m-card-hover" id="widget-news">
         <div class="widget-label label-row">
           <span><span class="msr">newspaper</span>News</span>
@@ -165,7 +100,60 @@
         </div>
         <div class="news-list" id="news-list"></div>
       </div>
+    </div>
 
+    <!-- Now Playing -->
+    <div class="glass music-card m-card-hover">
+      <div class="now-playing-empty" id="now-playing-empty">Nothing playing</div>
+      <div id="widget-music" style="display:none">
+        <div class="music-inner">
+          <div id="music-art" class="music-art"><span class="music-note msr">music_note</span></div>
+          <div class="music-info">
+            <span id="music-source" class="music-source" hidden></span>
+            <div id="music-title" class="music-title"></div>
+            <div id="music-artist" class="music-artist"></div>
+          </div>
+          <div class="music-controls">
+            <button class="music-btn" onclick="mediaCommand('prev')"><span class="msr">skip_previous</span></button>
+            <button class="music-btn music-btn-play" onclick="mediaCommand('toggle')"><span class="msr" id="music-play-glyph">pause</span></button>
+            <button class="music-btn" onclick="mediaCommand('next')"><span class="msr">skip_next</span></button>
+          </div>
+        </div>
+        <div class="music-bar-wrap">
+          <div id="music-bar-fill" class="music-bar-fill"></div>
+        </div>
+        <!-- Not shown in the portrait design; kept so music-widget.js has its targets -->
+        <div class="music-time-row" hidden>
+          <span id="music-time-start" class="music-time">0:00</span>
+          <span id="music-time-end" class="music-time">0:00</span>
+        </div>
+        <div id="music-time" hidden></div>
+      </div>
+    </div>
+
+    <!-- Ask Mira · Quote -->
+    <div class="mira-footer">
+      <div class="orb-wrap ai-card" id="widget-ai-bar">
+        <div class="orb-panel" id="orb-panel">
+          <div class="ai-card-hint">Say <span>"Hey Mirror"</span> to begin.</div>
+          <div class="orb-input-row">
+            <input type="text" id="orb-input" class="orb-input" placeholder="Ask Mira anything…" autocomplete="off" />
+            <button class="orb-send" id="orb-send"><span class="msr">arrow_upward</span></button>
+          </div>
+        </div>
+        <button class="orb-pill" id="orb-btn" aria-label="Ask Mira">
+          <span class="orb-mic"><span class="msr">mic</span></span>
+          <span class="orb-wave" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </span>
+          <span class="orb-pill-label">Ask Mira</span>
+        </button>
+      </div>
+
+      <div class="quote-block">
+        <div class="quote-serif">“<span id="quote-text">…</span>”</div>
+        <div class="quote-author-line"><span id="quote-author-name"></span></div>
+      </div>
     </div>
 
   </div><!-- /mira-root -->
@@ -193,7 +181,7 @@
 
   <!-- Spotify not-connected hint -->
   <div id="spotify-hint" style="
-    display:none; position:fixed; bottom:40px; right:18px;
+    display:none; position:fixed; top:18px; right:18px;
     background:rgba(10,10,10,0.95); border:1px solid rgba(244,177,131,0.25);
     border-radius:12px; padding:10px 14px; z-index:60;
     align-items:center; gap:10px; font-family:'Manrope',sans-serif;">
@@ -233,13 +221,13 @@
   <script src="js/media.js"></script>
   <script src="js/weather-icons.js"></script>
   <script src="js/slideshow.js"></script>
-  <script src="js/music-widget.js"></script>
+  <script src="js/music-widget.js?v=mira-rotate1"></script>
   <script src="js/spotify-player.js"></script>
   <script src="js/fitness-widget.js"></script>
-  <script src="js/alarm-widget.js"></script>
+  <script src="js/alarm-widget.js?v=mira-rotate1"></script>
   <script src="js/modes/karaoke.js"></script>
-  <script src="js/screensaver.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/screensaver.js?v=mira-rotate1"></script>
+  <script src="js/main.js?v=mira-rotate1"></script>
 </body>
 
 </html>

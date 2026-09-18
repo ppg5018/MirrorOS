@@ -2,15 +2,60 @@
    MirrorOS — main.js
    ============================================ */
 
-// ── Viewport scaling (matches Figma's transform:scale approach) ──────────────
-// Scales the entire UI so a 1920×1080 design fits any screen size
-;(function applyScale() {
-  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
-  document.documentElement.style.zoom = scale
+// ── Viewport scaling + rotation ──────────────────────────────────────────────
+// The dashboard is designed on an 810×1440 portrait (9:16) canvas. The monitor
+// is physically turned on its side while the Pi keeps outputting landscape
+// (1920×1080), so the canvas is rotated in software to read upright.
+//
+// Rotation comes from ?rotate=90|-90|0 (remembered in localStorage so the
+// kiosk keeps it across reloads). 90 = content turned clockwise, for a monitor
+// turned counter-clockwise; use -90 if the monitor was turned the other way.
+// 0 = no rotation (screen already rotated at the OS level, or a dev browser).
+//
+// Scale + rotate are one transform on <body>. A transformed body is also the
+// containing block for position:fixed overlays (alarm, screensaver, orb…), so
+// they are rotated and scaled together with the dashboard.
+const CANVAS_W = 810
+const CANVAS_H = 1440
+const DEFAULT_ROTATION = 90
+const MIRA_ROTATION = (function resolveRotation() {
+  const valid = v => v === 0 || v === 90 || v === -90
+  let fromUrl = null
+  try { fromUrl = new URLSearchParams(location.search).get('rotate') } catch (_) {}
+  if (fromUrl !== null && valid(Number(fromUrl))) {
+    try { localStorage.setItem('mira_rotate', String(Number(fromUrl))) } catch (_) {}
+    return Number(fromUrl)
+  }
+  let saved = null
+  try { saved = localStorage.getItem('mira_rotate') } catch (_) {}
+  if (saved !== null && valid(Number(saved))) return Number(saved)
+  return DEFAULT_ROTATION
 })()
-window.addEventListener('resize', function () {
-  document.documentElement.style.zoom = Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
-})
+window.MIRA_ROTATION = MIRA_ROTATION
+
+function applyScale() {
+  const body = document.body
+  if (!body) return
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const rotated = MIRA_ROTATION !== 0
+  // On-screen footprint of the canvas once rotated
+  const boxW = rotated ? CANVAS_H : CANVAS_W
+  const boxH = rotated ? CANVAS_W : CANVAS_H
+  const scale = Math.min(vw / boxW, vh / boxH)
+  const offX = (vw - boxW * scale) / 2
+  const offY = (vh - boxH * scale) / 2
+
+  // transform-origin is top-left; the translate puts the rotated canvas's
+  // bounding box at (offX, offY).
+  let t = `translate(${offX}px, ${offY}px) `
+  if (MIRA_ROTATION === 90)  t += `translateX(${CANVAS_H * scale}px) rotate(90deg) `
+  if (MIRA_ROTATION === -90) t += `translateY(${CANVAS_W * scale}px) rotate(-90deg) `
+  t += `scale(${scale})`
+  body.style.transform = t
+}
+applyScale()
+window.addEventListener('resize', applyScale)
 
 // Flag: true while a direct text query is in flight (prevents socket double-animation)
 let _queryInFlight = false

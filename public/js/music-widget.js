@@ -98,8 +98,12 @@ class MusicWidget {
     // Album art
     if (artEl) {
       if (data.coverUrl) {
-        artEl.innerHTML = '<img src="' + data.coverUrl + '" ' +
-          'onerror="this.parentElement.innerHTML=\'<span class=\\\"music-note\\\">♪</span>\'">'
+        // Built via DOM (not an inline onerror string) so a broken cover
+        // falls back cleanly instead of leaking attribute text into the card.
+        const img = document.createElement('img')
+        img.src = data.coverUrl
+        img.onerror = () => { artEl.innerHTML = '<span class="music-note">♪</span>' }
+        artEl.replaceChildren(img)
         artEl.style.cssText = ''
       } else {
         artEl.innerHTML = '<span class="music-note">♪</span>'

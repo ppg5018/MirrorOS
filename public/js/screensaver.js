@@ -47,12 +47,11 @@ class ScreensaverMode {
   }
 
   _coverScreen() {
-    // main.js applies CSS zoom to <html> to scale the 1920×1080 design.
-    // That zoom shrinks fixed-position elements too, so 100vw/100vh no longer
-    // cover the real viewport. Compensate by sizing the overlay with inverse zoom.
-    const zoom = parseFloat(document.documentElement.style.zoom) || 1
-    this.overlay.style.width  = Math.ceil(window.innerWidth  / zoom) + 'px'
-    this.overlay.style.height = Math.ceil(window.innerHeight / zoom) + 'px'
+    // main.js scales/rotates <body> with a transform, which makes body the
+    // containing block for this fixed overlay — so covering the 810×1440
+    // canvas covers the whole (rotated) screen.
+    this.overlay.style.width  = '810px'
+    this.overlay.style.height = '1440px'
   }
 
   async enter() {
@@ -62,7 +61,7 @@ class ScreensaverMode {
 
     console.log('[Screensaver] entered')
 
-    // Cover full screen regardless of page zoom
+    // Cover the whole canvas
     this._coverScreen()
 
     // Show overlay (display:flex first, then opacity transition)
