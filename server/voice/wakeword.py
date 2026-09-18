@@ -83,6 +83,27 @@ COOLDOWN_SECONDS = float(os.environ.get('WAKE_COOLDOWN', '1.5'))
 # self-test at your own pace and see whether your voice registers.
 WAKE_DEBUG      = os.environ.get('WAKE_DEBUG', '') not in ('', '0', 'false', 'False')
 
+# WAKE_DENOISE=1 → openWakeWord's Speex noise suppression. Optional: needs the
+# speexdsp-ns package (libspeexdsp-dev, no aarch64 wheel for Python 3.13), so it
+# is not in requirements.txt and a missing package only logs a warning.
+WAKE_DENOISE    = os.environ.get('WAKE_DENOISE', '0') not in ('', '0', 'false', 'False')
+
+# ── Mic DSP config ──────────────────────────────────────────
+# The mic is read raw (ALSA "mirror_raw": 48 kHz, S32_LE, stereo) and filtered
+# BEFORE any gain. The INMP441's noise is ~97% below 50 Hz (DC wander + rumble);
+# the old ALSA chain applied gain first, so that rumble clipped and took the
+# speech with it. See MicDSP.
+HW_RATE         = 48000
+DECIMATE        = HW_RATE // SAMPLE_RATE           # 3
+HW_BLOCK        = FRAME_LENGTH * DECIMATE          # 3840 frames = 80 ms at 48 kHz
+MIC_HPF_HZ          = float(os.environ.get('MIC_HPF_HZ', '100'))
+MIC_LPF_HZ          = 7200.0                       # anti-alias for the /3 decimation
+AGC_TARGET_DBFS     = float(os.environ.get('MIC_AGC_TARGET_DBFS', '-22'))
+AGC_MAX_GAIN_DB     = float(os.environ.get('MIC_AGC_MAX_GAIN_DB', '30'))
+AGC_FLOOR_DBFS      = float(os.environ.get('MIC_AGC_FLOOR_DBFS', '-50'))
+AGC_ATTACK_S        = 0.05
+AGC_RELEASE_S       = 2.0
+
 # Fallback bundled model when no custom wake-word file is present.
 # Built-ins: hey_jarvis, hey_mycroft, hey_rhasspy, alexa
 WAKE_MODEL      = os.environ.get('WAKE_MODEL', 'hey_jarvis')
@@ -156,6 +177,80 @@ def resume_media():
     except Exception:
         pass  # Best-effort, same as pause
 
+# ── Mic capture + DSP ───────────────────────────────────────
+def _dbfs(x):
+    """RMS level of a float block in dBFS (-inf-safe)."""
+    rms = float(np.sqrt(np.mean(x * x))) if x.size else 0.0
+    return 20.0 * np.log10(rms) if rms > 1e-10 else -200.0
+
+
+class MicDSP:
+    """48 kHz float mono -> 16 kHz int16, filter first, gain last.
+
+    1. 4th-order Butterworth HPF (MIC_HPF_HZ) cascaded with an 8th-order LPF
+       at 7.2 kHz, one SOS array, state (zi) carried across blocks. Resetting
+       it per block puts a step at every 80 ms boundary, and those transients
+       false-trigger the wake word.
+    2. Decimate by 3 with plain slicing — the LPF above is the anti-alias
+       filter (resample_poly per block is stateless and leaves edge artefacts).
+    3. AGC toward AGC_TARGET_DBFS: gain clamped to [0, AGC_MAX_GAIN_DB], one-pole
+       smoothed (fast attack, slow release) and frozen on blocks quieter than
+       AGC_FLOOR_DBFS so silence is never pumped up into the model.
+    4. Soft-clip at +/-0.99, convert to int16.
+    """
+
+    def __init__(self):
+        from scipy.signal import butter
+        hp = butter(4, MIC_HPF_HZ, btype='highpass', fs=HW_RATE, output='sos')
+        lp = butter(8, MIC_LPF_HZ, btype='lowpass', fs=HW_RATE, output='sos')
+        self.sos = np.vstack([hp, lp])
+        self.zi = np.zeros((self.sos.shape[0], 2))
+        self.gain_db = 0.0
+        self.in_dbfs = -200.0     # pre-gain level of the last block (debug)
+
+    def filter_decimate(self, x):
+        """48 kHz float block -> filtered 16 kHz float block (stateful)."""
+        from scipy.signal import sosfilt
+        y, self.zi = sosfilt(self.sos, x, zi=self.zi)
+        return y[::DECIMATE]
+
+    def apply_agc(self, y, adapt=True):
+        """16 kHz float block -> int16, updating the AGC gain if adapt."""
+        self.in_dbfs = _dbfs(y)
+        if adapt and self.in_dbfs > AGC_FLOOR_DBFS:
+            desired = min(max(AGC_TARGET_DBFS - self.in_dbfs, 0.0), AGC_MAX_GAIN_DB)
+            tau = AGC_ATTACK_S if desired < self.gain_db else AGC_RELEASE_S
+            alpha = 1.0 - np.exp(-(y.size / SAMPLE_RATE) / tau)
+            self.gain_db += alpha * (desired - self.gain_db)
+        out = y * (10.0 ** (self.gain_db / 20.0))
+        out = 0.99 * np.tanh(out / 0.99)                   # soft clip at +/-0.99
+        return np.round(out * 32767.0).astype(np.int16)
+
+    def process(self, x, adapt=True):
+        return self.apply_agc(self.filter_decimate(x), adapt)
+
+
+class MicCapture:
+    """The one place audio is read. read() returns a FRAME_LENGTH (1280)
+    int16 mono frame at 16 kHz — what model.predict() and save_wav() expect."""
+
+    def __init__(self, stream, channels):
+        self.stream = stream
+        self.channels = channels
+        self.dsp = MicDSP()
+
+    def read(self, adapt=True):
+        raw = self.stream.read(HW_BLOCK, exception_on_overflow=False)
+        pcm = np.frombuffer(raw, dtype='<i4').reshape(-1, self.channels)
+        # Channel 0 only: the INMP441 (L/R -> GND) drives the left slot and the
+        # right slot is measured all-zero — summing would only add noise.
+        x = pcm[:, 0].astype(np.float64) / 2147483648.0
+        return self.dsp.process(x, adapt)
+
+    def backlog_blocks(self):
+        return self.stream.get_read_available() // HW_BLOCK
+
+
 # ── Audio helpers ───────────────────────────────────────────
 def save_wav(frames, filename):
     with wave.open(filename, 'wb') as wf:
@@ -164,8 +259,9 @@ def save_wav(frames, filename):
         wf.setframerate(SAMPLE_RATE)
         wf.writeframes(b''.join(frames))
 
-def record(stream, seconds):
-    SILENCE_THRESHOLD = int(os.environ.get('SILENCE_THRESHOLD', '500'))
+def record(mic, seconds):
+    # int16 RMS of a post-AGC frame; see SILENCE_THRESHOLD in ecosystem.config.js
+    SILENCE_THRESHOLD = int(os.environ.get('SILENCE_THRESHOLD', '1400'))
 
     # Everything below is TIME-based so it stays correct no matter what
     # FRAME_LENGTH is. (This is what broke: the old code counted frames, so
@@ -187,13 +283,13 @@ def record(stream, seconds):
     log(f'Recording up to {seconds}s (stops {silence_secs}s after you finish)...')
 
     for i in range(total_frames):
-        data = stream.read(FRAME_LENGTH, exception_on_overflow=False)
-        frames.append(data)
+        frame = mic.read()
+        frames.append(frame.tobytes())
 
         # numpy, not a Python per-sample loop: this runs 12.5x/sec on a Pi 4
         # that is also driving Chromium, and the loop has to keep up with the
         # mic in real time or PortAudio starts dropping frames.
-        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+        samples = frame.astype(np.float32)
         rms = float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
 
         if rms > SILENCE_THRESHOLD:
@@ -214,7 +310,7 @@ def record(stream, seconds):
 
     return frames
 
-def drain_stream(stream):
+def drain_stream(mic):
     """Discard audio that piled up while we were busy.
 
     record -> transcribe -> Claude -> speak takes several seconds, and PortAudio
@@ -222,14 +318,18 @@ def drain_stream(stream):
     on stale audio -- including the mirror's own spoken reply bleeding back in
     through the mic -- and re-triggers on its own voice. model.reset() clears the
     wake-word feature buffer, not PortAudio's, so both are needed.
+
+    The backlog still goes through mic.read() so the filter state stays
+    continuous, but with the AGC frozen: it is stale audio (mostly our own
+    reply) and must not drag the gain away from the user's voice level.
     """
     try:
         dropped = 0
         limit = SAMPLE_RATE * 30          # never spin forever on a stuck stream
         while dropped < limit:
-            if stream.get_read_available() < FRAME_LENGTH:
+            if mic.backlog_blocks() < 1:
                 break
-            stream.read(FRAME_LENGTH, exception_on_overflow=False)
+            mic.read(adapt=False)
             dropped += FRAME_LENGTH
         if dropped:
             log(f'Flushed {dropped / SAMPLE_RATE:.1f}s of buffered audio')
@@ -237,7 +337,7 @@ def drain_stream(stream):
         log(f'stream flush skipped: {e}')
 
 
-def settle(stream, model, seconds=None):
+def settle(mic, model, seconds=None):
     """Swallow live audio for a moment after a command finishes.
 
     drain_stream() only clears what PortAudio already buffered. It cannot help
@@ -246,12 +346,13 @@ def settle(stream, model, seconds=None):
     the mirror ends up answering itself in a loop. So read and throw away audio
     for a short refractory window, then reset the detector so it restarts from a
     clean feature buffer rather than one primed with our own voice.
+    AGC is frozen here for the same reason as in drain_stream().
     """
     seconds = COOLDOWN_SECONDS if seconds is None else seconds
     deadline = time.time() + seconds
     try:
         while time.time() < deadline:
-            stream.read(FRAME_LENGTH, exception_on_overflow=False)
+            mic.read(adapt=False)
     except Exception as e:
         log(f'settle interrupted: {e}')
     model.reset()
@@ -290,6 +391,21 @@ def send_to_backend(text):
     return resp.json().get('reply', '')
 
 # ── Model loading ───────────────────────────────────────────
+def _new_model(**kwargs):
+    """openWakeWord Model, with Speex noise suppression if WAKE_DENOISE=1 and
+    speexdsp-ns is importable. A missing optional package must never stop the
+    voice loop from starting — warn once and build the model without it."""
+    if WAKE_DENOISE:
+        try:
+            import speexdsp_ns  # noqa: F401 — availability check only
+            model = Model(enable_speex_noise_suppression=True, **kwargs)
+            log('Speex noise suppression: on')
+            return model
+        except Exception as e:
+            log(f'WARNING: WAKE_DENOISE=1 but Speex noise suppression is unavailable '
+                f'({type(e).__name__}: {e}) — continuing without it')
+    return Model(**kwargs)
+
 def load_model():
     """Ensure feature models are present, then load the wake-word model.
 
@@ -306,7 +422,7 @@ def load_model():
         framework = WAKE_FRAMEWORK or (
             'tflite' if MODEL_PATH.endswith('.tflite') else 'onnx')
         log(f'Using custom wake word: {MODEL_PATH} ({framework})')
-        model = Model(wakeword_models=[MODEL_PATH], inference_framework=framework)
+        model = _new_model(wakeword_models=[MODEL_PATH], inference_framework=framework)
         target_key = os.path.splitext(os.path.basename(MODEL_PATH))[0]
         display = _cfg_name or 'Hey Mirror'
     else:
@@ -318,8 +434,8 @@ def load_model():
             log(f'WARNING: falling back to built-in "{WAKE_MODEL}" — say "{spoken}" instead.')
             log('Train a free custom model: https://github.com/dscripka/openWakeWord')
         log(f'Using built-in model: "{WAKE_MODEL}"')
-        model = Model(wakeword_models=[WAKE_MODEL],
-                      inference_framework=WAKE_FRAMEWORK or 'onnx')
+        model = _new_model(wakeword_models=[WAKE_MODEL],
+                           inference_framework=WAKE_FRAMEWORK or 'onnx')
         target_key = list(model.models.keys())[0]
         display = WAKE_MODEL.replace('_', ' ').title()
 
@@ -334,22 +450,30 @@ def main():
 
     pa = pyaudio.PyAudio()
 
-    # The INMP441 I2S mic is the ALSA device "mirror_mic" (scripts/setup-mic.sh);
-    # PortAudio's default input on a Pi has no capture. See server/voice/mic.py.
+    # The INMP441 I2S mic is opened raw as the ALSA device "mirror_raw"
+    # (scripts/setup-mic.sh, MIC_DEVICE in ecosystem.config.js) — all filtering
+    # and gain happen in MicDSP. PortAudio's default input on a Pi has no
+    # capture. See server/voice/mic.py.
     mic_index, mic_desc = resolve_input_device(pa, log)
 
     def open_stream(index):
-        return pa.open(
-            rate=SAMPLE_RATE,
-            channels=1,
-            format=pyaudio.paInt16,
+        """Open at the hardware format (48 kHz S32, up to 2 channels — a dev
+        machine's mic may be mono). Returns (stream, channels)."""
+        info = (pa.get_device_info_by_index(index) if index is not None
+                else pa.get_default_input_device_info())
+        channels = max(1, min(2, int(info.get('maxInputChannels', 1) or 1)))
+        stream = pa.open(
+            rate=HW_RATE,
+            channels=channels,
+            format=pyaudio.paInt32,
             input=True,
             input_device_index=index,
-            frames_per_buffer=FRAME_LENGTH
+            frames_per_buffer=HW_BLOCK
         )
+        return stream, channels
 
     try:
-        stream = open_stream(mic_index)
+        stream, channels = open_stream(mic_index)
     except Exception as e:
         if mic_index is None:
             raise
@@ -357,33 +481,41 @@ def main():
         # missing sound card. Try the default input rather than crash-looping.
         log(f'Could not open mic {mic_desc} ({e}) — falling back to default input')
         mic_desc = 'system default'
-        stream = open_stream(None)
-    log(f'Microphone: {mic_desc}')
+        stream, channels = open_stream(None)
+    mic = MicCapture(stream, channels)
+    log(f'Microphone: {mic_desc} — {HW_RATE} Hz S32 x{channels}, '
+        f'HPF {MIC_HPF_HZ:g} Hz, AGC {AGC_TARGET_DBFS:g} dBFS '
+        f'(max +{AGC_MAX_GAIN_DB:g} dB, frozen below {AGC_FLOOR_DBFS:g} dBFS)')
 
     log(f'Say "{wake_word_name}" to activate the mirror '
         f'(model="{target_key}", threshold={DETECT_THRESHOLD})')
 
     _dbg_frames = 0
     _dbg_peak_amp = 0
+    _dbg_peak_in = -200.0
     _dbg_peak_score = 0.0
 
     try:
         while True:
-            pcm_raw = stream.read(FRAME_LENGTH, exception_on_overflow=False)
-            frame = np.frombuffer(pcm_raw, dtype=np.int16)
+            frame = mic.read()
 
             scores = model.predict(frame)
             score = scores.get(target_key, max(scores.values()) if scores else 0.0)
 
             if WAKE_DEBUG:
                 _dbg_frames += 1
-                _dbg_peak_amp = max(_dbg_peak_amp, int(np.abs(frame).max()))
+                _dbg_peak_amp = max(_dbg_peak_amp, int(np.abs(frame.astype(np.int32)).max()))
+                _dbg_peak_in = max(_dbg_peak_in, mic.dsp.in_dbfs)
                 _dbg_peak_score = max(_dbg_peak_score, score)
                 if _dbg_frames >= 25:  # ~2s @ 80ms/frame
-                    log(f'[debug] mic_peak={_dbg_peak_amp:5d}  wake_score={_dbg_peak_score:.2f}'
+                    # out_peak = post-AGC int16 peak, gain = AGC gain now,
+                    # in = loudest pre-gain block (compare with MIC_AGC_FLOOR_DBFS)
+                    log(f'[debug] out_peak={_dbg_peak_amp:5d}  gain={mic.dsp.gain_db:+5.1f} dB'
+                        f'  in={_dbg_peak_in:6.1f} dBFS  wake_score={_dbg_peak_score:.2f}'
                         f'  (need >= {DETECT_THRESHOLD})')
                     _dbg_frames = 0
                     _dbg_peak_amp = 0
+                    _dbg_peak_in = -200.0
                     _dbg_peak_score = 0.0
 
             if score >= DETECT_THRESHOLD:
@@ -400,7 +532,7 @@ def main():
                     notify_backend('listening')
 
                     # 3. Record audio
-                    frames = record(stream, RECORD_SECONDS)
+                    frames = record(mic, RECORD_SECONDS)
                     save_wav(frames, WAV_PATH)
 
                     # 4. Transcribe
@@ -434,8 +566,8 @@ def main():
                 #    spoken reply can't re-trigger detection.
                 resume_media()
                 notify_backend('idle')
-                drain_stream(stream)   # clear the backlog that piled up
-                settle(stream, model)  # then let our own reply die out
+                drain_stream(mic)      # clear the backlog that piled up
+                settle(mic, model)     # then let our own reply die out
 
     except KeyboardInterrupt:
         log('Shutting down')

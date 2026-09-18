@@ -46,10 +46,15 @@ module.exports = {
         PYTHONUNBUFFERED: '1',
         MIRROR_BACKEND:   'http://localhost:3000',
 
-        // Microphone: the INMP441 I2S mic, exposed as the ALSA device
-        // "mirror_mic" by scripts/setup-mic.sh (see server/voice/mic.py).
-        // If it is missing, the loop logs a warning and uses the default input.
-        MIC_DEVICE:       'mirror_mic',
+        // Microphone: the INMP441 I2S mic opened RAW as the ALSA device
+        // "mirror_raw" (scripts/setup-mic.sh). wakeword.py filters (100 Hz HPF),
+        // decimates to 16 kHz and applies AGC itself — gain after filtering, so
+        // the mic's low-frequency rumble can't clip. If the device is missing,
+        // the loop logs a warning and uses the default input.
+        MIC_DEVICE:       'mirror_raw',
+        // Mic DSP (defaults shown): MIC_HPF_HZ '100', MIC_AGC_TARGET_DBFS '-22',
+        // MIC_AGC_MAX_GAIN_DB '30', MIC_AGC_FLOOR_DBFS '-50'
+        // WAKE_DENOISE:   '1',      // Speex NS; needs speexdsp-ns (optional)
 
         // Wake word. WAKE_MODEL picks a bundled openWakeWord model
         // (hey_jarvis, hey_mycroft, hey_rhasspy, alexa). config/wakeword.json
@@ -66,7 +71,10 @@ module.exports = {
         // Recording / endpointing
         RECORD_SECONDS:     '8',
         SILENCE_SECONDS:    '0.7',
-        SILENCE_THRESHOLD:  '500',
+        // int16 RMS of the post-AGC signal. AGC holds speech near -22 dBFS
+        // (~2600) and the noise floor sits near -33 dBFS (~680); 1400 splits
+        // them. The old 500 was tuned on the unfiltered, clipping ALSA chain.
+        SILENCE_THRESHOLD:  '1400',
         PRESPEECH_TIMEOUT:  '3.0'
       }
     },

@@ -1,9 +1,11 @@
 """
 MirrorOS — microphone selection, shared by wakeword.py and the mic test scripts.
 
-On the Pi the INMP441 I2S mic is exposed by scripts/setup-mic.sh as the ALSA
-device "mirror_mic" (48 kHz / 32-bit stereo hardware, converted by ALSA into
-whatever the caller asks for — wakeword.py asks for 16 kHz / 16-bit mono).
+On the Pi scripts/setup-mic.sh exposes the INMP441 I2S mic as two ALSA devices:
+"mirror_raw" (untouched 48 kHz / 32-bit stereo — wakeword.py opens this via
+MIC_DEVICE and does its own filtering + AGC) and "mirror_mic" (the same stream
+with a fixed gain, converted to whatever the caller asks for — used by the test
+tools).
 PortAudio's *default* input on a Pi is usually an HDMI/headphone card with no
 capture at all, so the mic has to be picked by name.
 

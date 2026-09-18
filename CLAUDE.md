@@ -86,7 +86,7 @@ MirrorOS/                         ← on the Pi: /home/mira/Desktop/MirrorOs (lo
 │   │   ├── wakeword.py           ← openWakeWord always-listening loop; records → transcribe → /api/voice → speak
 │   │   ├── transcribe.py         ← Sarvam Saarika only; exit 3 = STT unavailable (no key / Sarvam down)
 │   │   ├── speak.py              ← Sarvam Bulbul, Piper, or pyttsx3
-│   │   ├── mic.py                ← Picks the recording device (MIC_DEVICE → "mirror_mic" → default)
+│   │   ├── mic.py                ← Picks the recording device (MIC_DEVICE → "mirror_mic" → default; PM2 sets mirror_raw)
 │   │   └── piper-voices/         ← en_US-amy-medium.onnx (downloaded once)
 │   ├── sensors/
 │   │   └── pir.py                ← HC-SR501 on GPIO; screen on/off; POST /api/sensors/motion
@@ -379,7 +379,7 @@ The dashboard's AI test input bar (`initTestInput()` in `main.js`) bypasses the 
 
 **LED strip** (`server/led/controller.py`, WS2812B): invoked as `python3 controller.py <mode> [brightness]` from `/api/backlight`. Modes: warm, cool, night, party, music_sync, red, green, blue, off. Strip not wired yet. Note `LED_PIN = 18` (pin 12) is now the mic's I2S clock — pick another pin when the strip is added.
 
-**Microphone** (INMP441, I2S): VDD→pin 1, GND→pin 6, L/R→pin 9 (GND), SCK→pin 12 (GPIO18), WS→pin 35 (GPIO19), SD→pin 38 (GPIO20). `sudo bash scripts/setup-mic.sh` (run, reboot, run again) enables `dtoverlay=googlevoicehat-soundcard` and writes the ALSA device `mirror_mic` to `/etc/asound.conf`: 48 kHz/S32 stereo hardware → any rate/format, both I2S slots summed, software gain = `MIC_GAIN_DB` (default 24). `server/voice/mic.py` selects it for `wakeword.py`, `test-mic.py` and `test-voice.sh`. The card is opened exclusively — stop `mirroros-voice` before running other mic tools. The overlay also claims GPIO16 (pin 36); keep it free.
+**Microphone** (INMP441, I2S): VDD→pin 1, GND→pin 6, L/R→pin 9 (GND), SCK→pin 12 (GPIO18), WS→pin 35 (GPIO19), SD→pin 38 (GPIO20). `sudo bash scripts/setup-mic.sh` (run, reboot, run again) enables `dtoverlay=googlevoicehat-soundcard` and writes two ALSA devices to `/etc/asound.conf`. **`mirror_raw`** is the untouched hardware stream (48 kHz/S32 stereo; the mic is on ch0, ch1 is silent) — `wakeword.py` opens it (`MIC_DEVICE=mirror_raw`) and runs its own DSP in `MicDSP`: 100 Hz HPF + 7.2 kHz anti-alias LPF (one stateful SOS filter) → decimate ×3 to 16 kHz → AGC toward -22 dBFS → int16. **Filter before gain**: ~97% of the mic's noise is below 50 Hz, and gaining it first (the old ALSA chain) clipped the speech away. `MicCapture.read()` is the only place audio is read. **`mirror_mic`** is the same stream with a fixed software gain `MIC_GAIN_DB` (default 12) converted to any rate/format, used by `test-mic.py` and `test-voice.sh`. Check the DSP offline against a raw capture with `python3 scripts/check-mic-dsp.py /tmp/speech.wav`. The card is opened exclusively — stop `mirroros-voice` before running other mic tools. The overlay also claims GPIO16 (pin 36); keep it free.
 
 **Scheduler** (`server/scheduler.js`):
 - Fixed briefing via `BRIEFING_CRON` (default `0 7 * * *` IST).
@@ -491,7 +491,9 @@ Voice-process env (set in `ecosystem.config.js`, not `.env`) — these are the n
 
 | Var | Default | Purpose |
 |---|---|---|
-| `MIC_DEVICE` | `mirror_mic` | PortAudio input name (exact, else substring). Unset → `mirror_mic` if present, else default input. Missing → warning + default |
+| `MIC_DEVICE` | `mirror_raw` | PortAudio input name (exact, else substring). Unset → `mirror_mic` if present, else default input. Missing → warning + default |
+| `MIC_HPF_HZ` / `MIC_AGC_TARGET_DBFS` / `MIC_AGC_MAX_GAIN_DB` / `MIC_AGC_FLOOR_DBFS` | `100` / `-22` / `30` / `-50` | Mic DSP in `wakeword.py`. AGC gain is frozen on blocks quieter than the floor |
+| `WAKE_DENOISE` | `0` | `1` = openWakeWord Speex noise suppression; needs `speexdsp-ns` (not in requirements.txt), warns and continues if missing |
 | `WAKE_MODEL` | `hey_jarvis` | Bundled openWakeWord model (`hey_jarvis`, `hey_mycroft`, `hey_rhasspy`, `alexa`) |
 | `WAKE_WORD_PATH` | — | Absolute path to a custom `.onnx`/`.tflite` model (overrides `WAKE_MODEL`) |
 | `WAKE_FRAMEWORK` | inferred | `onnx` or `tflite`. Use `onnx` on the Pi — `tflite-runtime` has no wheels for Python 3.12+ |
@@ -499,7 +501,7 @@ Voice-process env (set in `ecosystem.config.js`, not `.env`) — these are the n
 | `WAKE_COOLDOWN` | `1.5` | Deaf window after replying so the mirror can't hear its own voice |
 | `WAKE_DEBUG` | off | Log mic level + score every ~2s |
 | `RECORD_SECONDS` | `8` | Max utterance length |
-| `SILENCE_SECONDS` / `SILENCE_THRESHOLD` / `PRESPEECH_TIMEOUT` | `0.7` / `500` / `3.0` | Endpointing |
+| `SILENCE_SECONDS` / `SILENCE_THRESHOLD` / `PRESPEECH_TIMEOUT` | `0.7` / `1400` / `3.0` | Endpointing. Threshold is int16 RMS of the post-AGC signal |
 
 `SARVAM_API_KEY` (+ `SARVAM_STT_*` / `SARVAM_TTS_*`) lives in `.env`; it is **required** for STT (the only engine) and enables Sarvam TTS (else Piper → pyttsx3); **`SARVAM_TTS_MODEL` must be `bulbul:v3`** — Sarvam retired `bulbul:v2` and it now 400s on every request. Legacy v2 speaker names are auto-remapped in `speak.py`.
 

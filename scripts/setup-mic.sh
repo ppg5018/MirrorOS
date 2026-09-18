@@ -11,21 +11,28 @@
 #   sudo reboot
 #   sudo bash scripts/setup-mic.sh      ← 2nd run: checks the mic, sets gain, test-records
 #
-# Safe to re-run any time. Change the mic gain with:
-#   sudo MIC_GAIN_DB=30 bash scripts/setup-mic.sh
+# Safe to re-run any time. Change the mirror_mic gain (test tools only) with:
+#   sudo MIC_GAIN_DB=18 bash scripts/setup-mic.sh
 #
 # What it sets up:
 #   /boot/firmware/config.txt  dtparam=i2s=on, dtoverlay=googlevoicehat-soundcard
-#   /etc/asound.conf           ALSA device "mirror_mic": 48 kHz / 32-bit stereo from
-#                              the mic, converted to the 16 kHz / 16-bit mono that
-#                              wakeword.py records, plus a software gain stage.
-#                              server/voice/mic.py picks this device by name.
+#   /etc/asound.conf           ALSA device "mirror_raw": the untouched 48 kHz / 32-bit
+#                              stereo I2S stream. The voice loop (wakeword.py) opens
+#                              this and does its own filter -> decimate -> AGC, so
+#                              low-frequency rumble is removed BEFORE any gain.
+#                              ALSA device "mirror_mic": the same stream converted to
+#                              any rate/format plus a fixed software gain, for the
+#                              test tools (test-mic.py, test-voice.sh, arecord).
 
 set -euo pipefail
 
 CARD="sndrpigooglevoi"          # ALSA card id created by the googlevoicehat overlay
-PCM="mirror_mic"                # device name the voice loop looks for
-GAIN_DB="${MIC_GAIN_DB:-24}"    # INMP441 is quiet at 16-bit; 24 dB suits ~0.5–1 m
+PCM="mirror_mic"                # gained + converted device for the test tools
+RAW_PCM="mirror_raw"            # raw device the voice loop opens (MIC_DEVICE)
+# mirror_mic gain. Not used by the voice loop. Kept at 12 dB: this gain is
+# applied before any filtering, and at 24 dB the mic's sub-50 Hz rumble alone
+# clips, which made every level reading from the test tools misleading.
+GAIN_DB="${MIC_GAIN_DB:-12}"
 MARK_BEGIN="# >>> MirrorOS INMP441 mic >>>"
 MARK_END="# <<< MirrorOS INMP441 mic <<<"
 ASOUND="/etc/asound.conf"
@@ -94,11 +101,22 @@ fi
 echo ""
 
 # ── 2. ALSA device "mirror_mic" ─────────────────────────────
-echo "[2/4] ALSA device '$PCM' ($ASOUND, gain ${GAIN_DB} dB)"
+echo "[2/4] ALSA devices '$RAW_PCM' + '$PCM' ($ASOUND, $PCM gain ${GAIN_DB} dB)"
 BLOCK=$(cat <<EOF
 $MARK_BEGIN
 # Written by scripts/setup-mic.sh — edit MIC_GAIN_DB and re-run instead of editing here.
 # Raw I2S capture: the googlevoicehat card only does 48 kHz, 32-bit, 2 channels.
+# The voice loop opens this directly and filters before applying any gain.
+# The hint block is required or PortAudio will not enumerate the device.
+pcm.$RAW_PCM {
+    type hw
+    card $CARD
+    device 0
+    hint {
+        show on
+        description "INMP441 raw I2S (MirrorOS DSP)"
+    }
+}
 pcm.${PCM}_hw {
     type hw
     card $CARD
@@ -195,15 +213,16 @@ with wave.open(path) as w:
     s = array.array('h', w.readframes(w.getnframes()))
 rms  = math.sqrt(sum(x * x for x in s) / len(s)) if s else 0.0
 peak = max((abs(x) for x in s), default=0)
-print(f'  level: rms={rms:.0f}  peak={peak}  (voice loop treats rms > 500 as speech)')
+print(f'  level: rms={rms:.0f}  peak={peak}  at {gain} dB fixed gain '
+      f'(the voice loop uses mirror_raw with its own filter + AGC, not this)')
 if peak < 100:
     print('  ✗ Almost silent. Check the SD wire is on pin 38 (not 40), L/R is on')
     print('    pin 9, and the mic header is soldered. Then re-run this script.')
 elif peak >= 32000:
-    print('  ! Clipping — lower the gain:  sudo MIC_GAIN_DB=18 bash scripts/setup-mic.sh')
+    print('  ! Clipping — lower the gain:  sudo MIC_GAIN_DB=6 bash scripts/setup-mic.sh')
 elif rms < 300:
     print(f'  ! Quiet at {gain} dB. Speak closer or raise the gain:')
-    print('      sudo MIC_GAIN_DB=30 bash scripts/setup-mic.sh')
+    print('      sudo MIC_GAIN_DB=18 bash scripts/setup-mic.sh')
 else:
     print('  ✓ Mic level looks good')
 PY
