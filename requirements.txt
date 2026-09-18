@@ -20,9 +20,7 @@ scikit-learn>=1.0
 # Audio I/O
 pyaudio>=0.2.13
 
-# Speech-to-text (Whisper — transcribe.py loads the 'base' model)
-openai-whisper>=20231117
-# Used by transcribe.py to boost quiet audio before STT
+# Used by transcribe.py to boost quiet mic audio before the Sarvam STT upload
 soundfile>=0.12
 
 # HTTP requests (used by wakeword.py to call backend)

@@ -259,14 +259,21 @@ def settle(stream, model, seconds=None):
 
 
 # ── Pipeline steps ──────────────────────────────────────────
+STT_UNAVAILABLE = 3   # transcribe.py exit code: Sarvam unusable (not "heard nothing")
+
 def transcribe(wav_path):
+    """Returns (text, error). error is a short message when STT is
+    unavailable (exit code 3), else None."""
     result = subprocess.run(
         ['python3', os.path.join(SCRIPT_DIR, 'transcribe.py'), wav_path],
         capture_output=True, text=True, timeout=60
     )
     if result.returncode != 0:
         log(f'transcribe stderr: {result.stderr.strip()}')
-    return result.stdout.strip()
+    if result.returncode == STT_UNAVAILABLE:
+        lines = result.stderr.strip().splitlines()
+        return '', (lines[-1] if lines else 'speech-to-text unavailable')
+    return result.stdout.strip(), None
 
 def speak(text):
     subprocess.run(
@@ -399,9 +406,13 @@ def main():
                     # 4. Transcribe
                     log('Transcribing...')
                     notify_backend('transcribing')
-                    text = transcribe(WAV_PATH)
+                    text, error = transcribe(WAV_PATH)
 
-                    if not text:
+                    if error:
+                        log(f'STT unavailable: {error}')
+                        notify_backend('speaking')
+                        speak("Sorry, I can't reach the speech service right now.")
+                    elif not text:
                         log('No speech detected, resuming')
                     else:
                         log(f'Heard: "{text}"')

@@ -24,7 +24,7 @@ The Pi runs three PM2 processes: the Node backend, the Python voice loop, and th
 | Frontend | Vanilla JS — no React, no Vue, no bundler, no build step |
 | AI | Anthropic Claude (`claude-haiku-4-5`) via `@anthropic-ai/sdk` |
 | Wake word | **openWakeWord** (Python, `server/voice/wakeword.py`) — open-source, no cloud, no access key. Default keyword `jarvis`; supports custom `.onnx` models |
-| Speech-to-text | **Sarvam Saarika** (cloud, Hinglish-aware) if `SARVAM_API_KEY` set, else **Whisper** `base` offline (`server/voice/transcribe.py`) |
+| Speech-to-text | **Sarvam Saarika** only (cloud, Hinglish-aware; `server/voice/transcribe.py`) — **`SARVAM_API_KEY` is required**; without it the mirror cannot hear commands. Offline STT (Whisper) was removed deliberately: it pulls in PyTorch (~1.5 GB installed, ~800 MB resident) on a 2 GB Pi and took 30–60 s per utterance. Don't re-add a local STT engine |
 | Text-to-speech | **Sarvam Bulbul** (cloud) if `SARVAM_API_KEY` set, else **Piper** neural offline, else `pyttsx3` (`server/voice/speak.py`) |
 | Music | Spotify Web API (control) + Raspotify/librespot Connect device on the Pi (audio) — **no** Web Playback SDK |
 | WhatsApp | **Baileys** (`@whiskeysockets/baileys`) — QR-linked, message reading |
@@ -84,7 +84,7 @@ MirrorOS/                         ← on the Pi: /home/mira/Desktop/MirrorOs (lo
 │   │   └── client.js             ← Baileys connect, QR, in-memory messageStore (LRU, ~40 contacts)
 │   ├── voice/
 │   │   ├── wakeword.py           ← openWakeWord always-listening loop; records → transcribe → /api/voice → speak
-│   │   ├── transcribe.py         ← Sarvam Saarika or Whisper base
+│   │   ├── transcribe.py         ← Sarvam Saarika only; exit 3 = STT unavailable (no key / Sarvam down)
 │   │   ├── speak.py              ← Sarvam Bulbul, Piper, or pyttsx3
 │   │   ├── mic.py                ← Picks the recording device (MIC_DEVICE → "mirror_mic" → default)
 │   │   └── piper-voices/         ← en_US-amy-medium.onnx (downloaded once)
@@ -139,7 +139,7 @@ MirrorOS/                         ← on the Pi: /home/mira/Desktop/MirrorOs (lo
 ├── src/                          ← ⚠️ Unused React/shadcn design export — NOT wired into the running mirror (see Dead / Separate Code)
 ├── landing/                      ← ⚠️ Separate marketing/SEO site (Mira) — NOT served by the Node backend
 ├── ecosystem.config.js           ← PM2: backend + voice + pir processes
-├── requirements.txt              ← Python deps (openWakeWord, whisper, piper-tts, pyaudio…)
+├── requirements.txt              ← Python deps (openWakeWord, piper-tts, pyaudio, soundfile…)
 └── .env                          ← All secrets (see Environment Variables)
 ```
 
@@ -354,7 +354,7 @@ wakeword.py (openWakeWord — default keyword "jarvis", custom .onnx supported)
   → POST /api/media/pause                        ← duck Spotify
   → POST /api/voice/state { event: 'listening' } ← UI glows teal
   → records ~8s to /tmp (stops on silence)
-  → transcribe.py  (Sarvam Saarika if SARVAM_API_KEY, else Whisper base)
+  → transcribe.py  (Sarvam Saarika — no offline fallback; exit 3 → speaks "can't reach the speech service")
   → POST /api/voice/state { event: 'transcribing' }
   → POST /api/voice { text }
       → server/routes/voice.js
@@ -500,9 +500,8 @@ Voice-process env (set in `ecosystem.config.js`, not `.env`) — these are the n
 | `WAKE_DEBUG` | off | Log mic level + score every ~2s |
 | `RECORD_SECONDS` | `8` | Max utterance length |
 | `SILENCE_SECONDS` / `SILENCE_THRESHOLD` / `PRESPEECH_TIMEOUT` | `0.7` / `500` / `3.0` | Endpointing |
-| `WHISPER_MODEL` / `WHISPER_LANG` | `base` / auto | Offline STT fallback only. Empty `WHISPER_LANG` = auto-detect |
 
-`SARVAM_API_KEY` (+ `SARVAM_STT_*` / `SARVAM_TTS_*`) lives in `.env` and enables Sarvam STT/TTS; **`SARVAM_TTS_MODEL` must be `bulbul:v3`** — Sarvam retired `bulbul:v2` and it now 400s on every request. Legacy v2 speaker names are auto-remapped in `speak.py`.
+`SARVAM_API_KEY` (+ `SARVAM_STT_*` / `SARVAM_TTS_*`) lives in `.env`; it is **required** for STT (the only engine) and enables Sarvam TTS (else Piper → pyttsx3); **`SARVAM_TTS_MODEL` must be `bulbul:v3`** — Sarvam retired `bulbul:v2` and it now 400s on every request. Legacy v2 speaker names are auto-remapped in `speak.py`.
 
 `WAKE_KEYWORD`, `KEYWORD_PATH` and `PORCUPINE_ACCESS_KEY` are dead names from the old Porcupine engine — nothing reads them. Don't add them back.
 

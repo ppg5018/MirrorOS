@@ -60,8 +60,8 @@ function updateMediaStatusBar() {
   }
 }
 
-// IMPORTANT: media must pause before Whisper STT loads (RAM constraint)
-// and so playing music doesn't bleed into the mic during recording.
+// IMPORTANT: media must pause before the voice loop records,
+// so playing music doesn't bleed into the mic during recording.
 async function pauseForVoice() {
   try {
     const np = await fetch('/api/spotify/now-playing').then(r => r.json())

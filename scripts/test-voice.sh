@@ -27,8 +27,8 @@ fi
 echo "  ✓ TTS working"
 echo ""
 
-# ── TEST 2: Whisper STT ──────────────────────────────────────
-echo "TEST 2 — Speech-to-Text (Sarvam Saarika → Whisper)"
+# ── TEST 2: STT ──────────────────────────────────────────────
+echo "TEST 2 — Speech-to-Text (Sarvam Saarika)"
 echo "Recording 4 seconds — say something now..."
 sleep 1
 
@@ -65,11 +65,17 @@ wf.close()
 print('Recording saved to /tmp/test_audio.wav')
 EOF
 
-echo "Transcribing (first run downloads ~75MB Whisper model)..."
-result=$(python3 server/voice/transcribe.py /tmp/test_audio.wav)
+echo "Transcribing..."
+# `|| stt_rc=$?` keeps set -e from aborting on exit 3 (STT unavailable)
+stt_rc=0
+result=$(python3 server/voice/transcribe.py /tmp/test_audio.wav) || stt_rc=$?
 
-if [ -z "$result" ]; then
-  echo "  WARNING: No speech detected. Try again with more volume."
+if [ "$stt_rc" -eq 3 ]; then
+  echo "  ERROR: Speech-to-text unavailable — SARVAM_API_KEY is unset in .env"
+  echo "         or Sarvam is unreachable (see the [transcribe] line above)."
+elif [ -z "$result" ]; then
+  echo "  WARNING: Empty transcript. Either the audio was too quiet (try again"
+  echo "  with more volume), or SARVAM_API_KEY is unset / Sarvam is unreachable."
 else
   echo "  You said: \"$result\""
   echo "  ✓ STT working"

@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 echo "=== MirrorOS Voice Setup ==="
 
 # ── System packages ─────────────────────────────────────────
-echo "[1/4] Installing system packages..."
+echo "[1/3] Installing system packages..."
 sudo apt-get update -qq
 sudo apt-get install -y \
   python3-pip \
@@ -23,7 +23,7 @@ sudo apt-get install -y \
   alsa-utils
 
 # ── Python packages ─────────────────────────────────────────
-echo "[2/4] Installing Python packages..."
+echo "[2/3] Installing Python packages..."
 # Pi OS (Bookworm+) marks the system Python "externally managed" (PEP 668) and
 # refuses plain pip installs. The mirror runs on system python3 under PM2, so
 # install there explicitly (as your user, not sudo — it lands in ~/.local).
@@ -37,13 +37,8 @@ pip3 install "${PIP_FLAGS[@]}" -r requirements.txt
 pip3 install "${PIP_FLAGS[@]}" --no-deps "openwakeword>=0.6.0"
 python3 -c "import openwakeword; print('  openwakeword: OK')"
 
-# ── Download Whisper model (offline STT fallback) ───────────
-WHISPER_MODEL="${WHISPER_MODEL:-base}"   # same default transcribe.py uses
-echo "[3/4] Pre-downloading Whisper '$WHISPER_MODEL' model..."
-python3 -c "import whisper; whisper.load_model('$WHISPER_MODEL'); print('  Whisper $WHISPER_MODEL: OK')"
-
 # ── Test audio device ────────────────────────────────────────
-echo "[4/4] Checking audio devices..."
+echo "[3/3] Checking audio devices..."
 arecord -l 2>/dev/null || echo "  WARNING: No recording devices found. For the INMP441 mic run: sudo bash scripts/setup-mic.sh"
 aplay  -l 2>/dev/null || echo "  WARNING: No playback devices found."
 

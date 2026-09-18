@@ -35,13 +35,13 @@ MirrorOS is an AI-powered smart mirror built for the Indian market (Pune-first).
 | Chromium (UI) | 280 MB | Always |
 | Node.js backend | 80 MB | Always |
 | Porcupine wake word | 40 MB | Always |
-| Whisper Tiny (STT) | 0 MB idle / 200–350 MB spike | Load on demand only |
+| Sarvam Saarika (STT) | ~0 MB (cloud) | No local STT model |
 | pyttsx3 TTS | 20 MB | Always |
 | PM2 + system | 30 MB | Always |
 | **At rest total** | **~600 MB** | 424 MB free |
 | **During voice** | **~920 MB** | Only ~100 MB free ⚠️ |
 
-**Critical constraint:** Media playback MUST pause before voice STT runs. Whisper Tiny must be used — not Base, Small, or Medium. React is banned — too heavy. Vanilla JS only.
+**Critical constraint:** Media playback MUST pause before voice STT runs. STT is cloud-only (Sarvam Saarika) — never add a local STT model (RAM). React is banned — too heavy. Vanilla JS only.
 
 ---
 
@@ -57,7 +57,7 @@ Backend   →  Node.js + Express (port 3000)
              PM2 (process manager, auto-restart, auto-start on boot)
              node-cron (7am morning briefing scheduler)
 
-Voice     →  Python: Porcupine (wake word) → Whisper Tiny (STT) → Claude API → pyttsx3 (TTS)
+Voice     →  Python: Porcupine (wake word) → Sarvam Saarika (STT, cloud) → Claude API → pyttsx3 (TTS)
 
 LEDs      →  Python: rpi_ws281x library on GPIO 18
 
@@ -101,7 +101,7 @@ MirrorOs/                      ← on the Pi: /home/mira/Desktop/MirrorOs
 │   │   └── functions.js       ← Tool implementations (calls route files)
 │   └── voice/
 │       ├── wakeword.py        ← Porcupine always-listening loop
-│       ├── transcribe.py      ← Whisper Tiny STT
+│       ├── transcribe.py      ← Sarvam Saarika STT (cloud)
 │       └── speak.py           ← pyttsx3 TTS (rate=165, volume=0.9)
 ├── config/
 │   ├── customer.json          ← Per-customer settings (city, widgets, branding)
@@ -215,7 +215,7 @@ wakeword.py — Porcupine detects "Hey Mirror" (offline, ~40MB, <100ms)
   ↓
 Record 4 seconds of audio → /tmp/voice_input.wav
   ↓
-transcribe.py — Whisper Tiny transcribes to text (1–2s, 200–350MB RAM spike)
+transcribe.py — Sarvam Saarika (cloud) transcribes to text
   ↓
 POST /api/voice with { text: "..." }
   ↓
@@ -335,7 +335,7 @@ module.exports = {
 ## Rules Claude Code must follow
 
 1. **Vanilla JS only** — no React, no Vue, no Svelte, no build toolchain
-2. **RAM budget is hard** — never load Whisper unless a voice command is active
+2. **RAM budget is hard** — no local STT model; STT is Sarvam (cloud)
 3. **Never put content in screen centre** — user's face reflects there
 4. **Always use CSS variables** — never hardcode colours
 5. **All secrets in .env** — never hardcode API keys

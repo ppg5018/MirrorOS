@@ -67,11 +67,7 @@ module.exports = {
         RECORD_SECONDS:     '8',
         SILENCE_SECONDS:    '0.7',
         SILENCE_THRESHOLD:  '500',
-        PRESPEECH_TIMEOUT:  '3.0',
-
-        // STT. Leave WHISPER_LANG unset for auto-detect — it is only the
-        // offline fallback; Sarvam (SARVAM_API_KEY in .env) is the primary.
-        WHISPER_MODEL:    'base'
+        PRESPEECH_TIMEOUT:  '3.0'
       }
     },
     {

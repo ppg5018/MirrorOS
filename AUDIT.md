@@ -78,8 +78,8 @@ The architecture is sound (Express + Socket.io + vanilla JS is the right call fo
 - **Tool errors narrated as success** — `functions.js:341-344`: failures returned as plain strings without `is_error: true`; Claude says "Done!" on failures.
 - **No timeouts anywhere** — `functions.js:6-20` (get/post), `karaoke.js:80` (LRCLIB), Anthropic client default 10 min while `wakeword.py` gives up at 30s → orphan `ai-response` events. Fix: `new Anthropic({ timeout: 20_000, maxRetries: 2 })` at module scope (currently constructed **per query**), AbortController ~8s in helpers.
 - **PII diagnostic logging** — `claude.js:378-493`: "DIAGNOSTIC LOGS (remove after confirming)" dump WhatsApp/calendar/history to pm2 logs 4× per query + double `JSON.stringify(messages, null, 2)` (CPU on Pi). Delete or gate behind `MIRROR_DEBUG`.
-- **Whisper reloaded per utterance** — `transcribe.py:113` spawned per command: ~10s+ model load per query on Pi 3 without Sarvam. Fix: resident STT daemon or `faster-whisper` tiny/int8.
-- **SSL verification disabled globally** — `transcribe.py:29-31`: unverified HTTPS context for all urllib traffic (model downloads can be MITM'd). Use certifi instead.
+- ~~**Offline STT reloaded per utterance**~~ — resolved: offline STT removed entirely; Sarvam Saarika is the only engine (no local engine should be re-added).
+- ~~**SSL verification disabled globally**~~ — resolved: the macOS unverified-context override was removed from `transcribe.py`.
 - **`get_news` returns hardcoded fictional headlines** — `functions.js:187-197` — read aloud as real news while a real `/api/news` route exists. Wire it up.
 - **Cost/latency:** every action command costs two Haiku calls. `functions.js` already returns human-ready sentences (`'Paused.'`, `'Playing X by Y.'`) — for control tools (play_music controls, slideshow, backlight, screensaver, karaoke open/close) speak `toolResult.message` directly and **skip the second Claude call** (~50% cost, 0.7–1.5s faster). Add a regex fast path in `voice.js` for "pause"/"next song"/"volume N" that skips Claude entirely.
 
@@ -128,7 +128,7 @@ The architecture is sound (Express + Socket.io + vanilla JS is the right call fo
 - **Companion loads Tailwind JIT CDN** (~300KB runtime compiler, barely used, breaks offline) + Lucide from CDN. Delete Tailwind, vendor Lucide.
 - **Offline-fragile CDNs on the kiosk** — Spotify SDK, Google Fonts, and **qrcode.js from jsdelivr — the setup QR screen fails offline, exactly when a fresh install needs it**. Vendor everything; or render the QR server-side (`qrcode` npm package already installed).
 - **Repeated-timestamp LRC lines mangled** — `karaoke.js:21-42`: `[00:12][01:05]Chorus` shows the raw second tag as lyric text; second occurrence lost; out-of-order lines break word-timing estimation. Loop leading tags + sort.
-- **Media `pauseForVoice()` doesn't pause** — `media.js:64-76`: comment says music must pause before Whisper loads (RAM), handler only sets a flag.
+- **Media `pauseForVoice()` doesn't pause** — `media.js:64-76`: comment says music must pause before voice recording, handler only sets a flag.
 
 ---
 
@@ -149,7 +149,7 @@ The architecture is sound (Express + Socket.io + vanilla JS is the right call fo
 **Latency/cost (biggest UX wins):**
 1. Skip the second Claude call for action tools; speak `toolResult.message` directly. Add regex fast-paths ("pause", "next", "volume N") that bypass Claude entirely — ~2s faster, zero cost, immune to misrouting.
 2. Stream the final response (`client.messages.stream`) and pipe the first sentence to TTS early.
-3. Resident STT: `faster-whisper` tiny/int8 daemon loaded once (several× faster, lower RAM than reloading `base` per utterance). Pair the existing RMS endpointing with `webrtcvad`.
+3. ~~Resident local STT~~ — superseded: offline STT was removed (Sarvam-only). Pairing the existing RMS endpointing with `webrtcvad` still applies.
 4. Karaoke sync: use the Web Playback SDK's local `player.getCurrentState()` position instead of polling `/api/spotify/position` 2×/s — removes the Spotify API load and 429 exposure entirely; keep REST polling only as a cast fallback.
 
 **Robustness:**

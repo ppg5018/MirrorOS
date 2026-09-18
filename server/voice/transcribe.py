@@ -2,33 +2,28 @@
 """
 MirrorOS — Speech-to-Text
 
-Priority chain:
-  1. Sarvam Saarika — Hinglish/Indian-accent aware, cloud (needs SARVAM_API_KEY)
-  2. Whisper 'base' — offline fallback
+One engine: Sarvam Saarika — Hinglish/Indian-accent aware, cloud.
+There is deliberately no offline fallback (a local engine is too heavy for the
+Pi's RAM). Without SARVAM_API_KEY the mirror cannot hear commands.
 
 Sarvam config (env / .env):
-  SARVAM_API_KEY     required to use Sarvam
+  SARVAM_API_KEY     required
   SARVAM_STT_MODEL   default: saarika:v2.5
   SARVAM_STT_LANG    default: en-IN   (use 'unknown' to auto-detect Hindi etc.)
 
-Whisper (fallback only):
-  WHISPER_LANG=en / hi / unset or empty (auto-detect)
-  WHISPER_MODEL=tiny / base   default: base  ('tiny' is much faster on a Pi 4)
-
 Usage: python3 transcribe.py /tmp/voice_input.wav
 Output: transcribed text on stdout (single line, no trailing newline)
+Exit codes:
+  0  success (stdout may be empty — the user said nothing)
+  1  usage error
+  3  STT unavailable (no SARVAM_API_KEY, or the Sarvam request failed)
 """
 
 import sys
 import os
 import re
-import ssl
 import warnings
 warnings.filterwarnings('ignore')
-
-# Fix SSL cert verification on macOS (not needed on Orange Pi/Linux)
-if sys.platform == 'darwin':
-    ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def _load_env():
@@ -45,22 +40,25 @@ _load_env()
 def _env(name, default=None):
     """os.environ.get, but an empty/whitespace value counts as unset.
 
-    PM2 passes `WHISPER_LANG: ''` from ecosystem.config.js, and a plain
-    os.environ.get(..., None) hands Whisper language='' -> it raises
-    `ValueError: Unsupported language:` and the whole offline STT path dies.
+    PM2 env blocks and .env lines like `SARVAM_STT_LANG=` produce empty
+    strings; sending those to Sarvam (e.g. language_code='') gets a 400,
+    so treat them as missing and use the default instead.
     """
     v = os.environ.get(name)
     v = v.strip() if isinstance(v, str) else v
     return v if v else default
 
 
-LANGUAGE     = _env('WHISPER_LANG')                  # None = auto-detect
-WHISPER_SIZE = _env('WHISPER_MODEL', 'base')         # 'tiny' is much faster on a Pi
-SARVAM_URL   = 'https://api.sarvam.ai/speech-to-text'
+SARVAM_URL = 'https://api.sarvam.ai/speech-to-text'
+STT_UNAVAILABLE = 3
+
+
+class STTUnavailable(Exception):
+    """Sarvam could not be used — distinct from 'heard nothing'."""
 
 
 def _clean(text):
-    """Strip Whisper artifacts and collapse whitespace."""
+    """Strip bracketed non-speech tags and collapse whitespace."""
     text = re.sub(r'\[.*?\]', '', text)      # [BLANK_AUDIO], etc.
     text = re.sub(r'\(.*?\)', '', text)      # (inaudible), etc.
     text = re.sub(r'\s+', ' ', text)
@@ -68,13 +66,30 @@ def _clean(text):
     return text if len(text) >= 3 else ''
 
 
-def transcribe_sarvam(wav_path):
+def boost_audio(wav_path, gain=2.0):
+    """Boost quiet audio in place before the Sarvam upload.
+
+    The INMP441 mic records quiet; a low-RMS clip transcribes badly or empty.
+    """
+    try:
+        import numpy as np
+        import soundfile as sf
+        data, samplerate = sf.read(wav_path)
+        rms = float(np.sqrt(np.mean(data**2)))
+        print(f'[transcribe] Audio RMS: {rms:.4f}', file=sys.stderr)
+        if rms < 0.01:
+            data = np.clip(data * gain, -1.0, 1.0)
+            sf.write(wav_path, data, samplerate)
+            print(f'[transcribe] Audio boosted {gain}x', file=sys.stderr)
+    except Exception as e:
+        print(f'[transcribe] boost_audio skipped: {e}', file=sys.stderr)
+
+
+def transcribe_sarvam(wav_path, key):
     """Transcribe via Sarvam Saarika.
-    Returns the transcript string on success (may be ''), or None on failure
-    (so the caller can fall back to Whisper)."""
-    key = _env('SARVAM_API_KEY')
-    if not key:
-        return None
+    Returns the transcript string (may be ''); raises STTUnavailable on
+    any request/HTTP/response failure."""
+    boost_audio(wav_path)
 
     import requests
 
@@ -91,85 +106,32 @@ def transcribe_sarvam(wav_path):
                 timeout=30
             )
     except Exception as e:
-        print(f'[transcribe] Sarvam request error: {e}', file=sys.stderr)
-        return None
+        raise STTUnavailable(f'Sarvam request error: {e}')
 
     if r.status_code != 200:
-        print(f'[transcribe] Sarvam STT {r.status_code}: {r.text[:200]}',
-              file=sys.stderr)
-        return None
+        raise STTUnavailable(f'Sarvam STT {r.status_code}: {r.text[:200]}')
 
-    transcript = (r.json() or {}).get('transcript', '')
+    try:
+        transcript = (r.json() or {}).get('transcript') or ''
+    except ValueError as e:
+        raise STTUnavailable(f'Sarvam returned invalid JSON: {e}')
+
     print(f'[transcribe] Sarvam transcript: "{transcript}"', file=sys.stderr)
     return transcript.strip()
 
 
-def boost_audio(wav_path, gain=2.0):
-    """Boost quiet audio before transcribing (Whisper fallback path)."""
-    try:
-        import numpy as np
-        import soundfile as sf
-        data, samplerate = sf.read(wav_path)
-        rms = float(np.sqrt(np.mean(data**2)))
-        print(f'[transcribe] Audio RMS: {rms:.4f}', file=sys.stderr)
-        if rms < 0.01:
-            data = np.clip(data * gain, -1.0, 1.0)
-            sf.write(wav_path, data, samplerate)
-            print(f'[transcribe] Audio boosted {gain}x', file=sys.stderr)
-    except Exception as e:
-        print(f'[transcribe] boost_audio skipped: {e}', file=sys.stderr)
-
-
-def transcribe_whisper(wav_path):
-    import whisper
-
-    boost_audio(wav_path)
-    model = whisper.load_model(WHISPER_SIZE)
-
-    result = model.transcribe(
-        wav_path,
-        language=LANGUAGE,              # None = auto-detect (Hinglish friendly)
-        fp16=False,                     # No GPU on Orange Pi / RPi
-        verbose=None,                   # None (not False) — silences Whisper's
-                                        # "Detected language: X" stdout line that
-                                        # was leaking into the transcribed text
-        temperature=0,
-        best_of=1,
-        beam_size=3,
-        condition_on_previous_text=False,
-        initial_prompt="Hey Mirror",
-        no_speech_threshold=0.6,
-        logprob_threshold=-1.0,
-        compression_ratio_threshold=2.4,
-    )
-
-    text = result.get('text', '').strip()
-    del model                          # free RAM immediately (Pi constraint)
-    return text
-
-
 def transcribe(wav_path):
+    """Return the cleaned transcript ('' if the file is missing or nothing
+    was said). Raises STTUnavailable when Sarvam can't be used."""
     if not os.path.exists(wav_path):
         print(f'[transcribe] ERROR: file not found: {wav_path}', file=sys.stderr)
         return ''
 
-    # 1. Sarvam (if configured). None => failed, fall back to Whisper.
-    if _env('SARVAM_API_KEY'):
-        text = transcribe_sarvam(wav_path)
-        if text is not None:
-            return _clean(text)
-        print('[transcribe] Sarvam failed — falling back to Whisper',
-              file=sys.stderr)
+    key = _env('SARVAM_API_KEY')
+    if not key:
+        raise STTUnavailable('no SARVAM_API_KEY — STT unavailable')
 
-    # 2. Whisper fallback. A crash here (bad WHISPER_LANG, missing model
-    #    download, OOM on the Pi) must surface as "no transcript", not a
-    #    traceback that leaves wakeword.py parsing stderr as the user's words.
-    try:
-        return _clean(transcribe_whisper(wav_path))
-    except Exception as e:
-        print(f'[transcribe] Whisper failed: {type(e).__name__}: {e}',
-              file=sys.stderr)
-        return ''
+    return _clean(transcribe_sarvam(wav_path, key))
 
 
 if __name__ == '__main__':
@@ -177,5 +139,10 @@ if __name__ == '__main__':
         print('Usage: transcribe.py <wav_file>', file=sys.stderr)
         sys.exit(1)
 
-    output = transcribe(sys.argv[1])
+    try:
+        output = transcribe(sys.argv[1])
+    except STTUnavailable as e:
+        print(f'[transcribe] {e}', file=sys.stderr)
+        sys.exit(STT_UNAVAILABLE)
+
     print(output, end='')
