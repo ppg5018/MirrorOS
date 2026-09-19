@@ -18,7 +18,7 @@
 #   /boot/firmware/config.txt  dtparam=i2s=on, dtoverlay=googlevoicehat-soundcard
 #   /etc/asound.conf           ALSA device "mirror_raw": the untouched 48 kHz / 32-bit
 #                              stereo I2S stream. The voice loop (wakeword.py) opens
-#                              this and does its own filter -> decimate -> AGC, so
+#                              this and does its own filter -> decimate -> gain, so
 #                              low-frequency rumble is removed BEFORE any gain.
 #                              ALSA device "mirror_mic": the same stream converted to
 #                              any rate/format plus a fixed software gain, for the
@@ -214,7 +214,7 @@ with wave.open(path) as w:
 rms  = math.sqrt(sum(x * x for x in s) / len(s)) if s else 0.0
 peak = max((abs(x) for x in s), default=0)
 print(f'  level: rms={rms:.0f}  peak={peak}  at {gain} dB fixed gain '
-      f'(the voice loop uses mirror_raw with its own filter + AGC, not this)')
+      f'(the voice loop uses mirror_raw with its own filter + gain, not this)')
 if peak < 100:
     print('  ✗ Almost silent. Check the SD wire is on pin 38 (not 40), L/R is on')
     print('    pin 9, and the mic header is soldered. Then re-run this script.')

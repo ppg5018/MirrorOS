@@ -11,9 +11,13 @@ Record a raw capture on the Pi (stop the voice loop first — the card is exclus
 Then:
   python3 scripts/check-mic-dsp.py [/tmp/speech.wav]
 
+Prints pre- and post-gain RMS / peak for the noise and speech sections, and
+the int16 RMS the endpointer in record() will see, so SILENCE_THRESHOLD can be
+checked against a real recording rather than inferred.
+
 Checks:
   - every block comes out int16, 1280 samples (16 kHz, 80 ms)
-  - speech blocks land within TOLERANCE_DB of MIC_AGC_TARGET_DBFS after AGC
+  - SILENCE_THRESHOLD sits above the noise blocks and below typical speech
   - filter state is continuous: block-by-block == one contiguous pass
 Exit code 0 = all checks passed, 1 = a check failed.
 """
@@ -42,13 +46,15 @@ except ImportError:
 
 import wakeword as ww  # noqa: E402
 
-TOLERANCE_DB = 4.0      # "within a few dB" of the AGC target
-SPEECH_WINDOW_DB = 8.0  # blocks within this of the loudest pre-gain block = speech
+# Section split on pre-gain block level: speech = within SPEECH_WINDOW_DB of the
+# loudest block; noise = within NOISE_WINDOW_DB of the quietest 10%. Blocks in
+# between (word onsets/tails) are left out of both.
+SPEECH_WINDOW_DB = 8.0
+NOISE_WINDOW_DB = 3.0
 
 
-def dbfs_int16(frame):
-    x = frame.astype(np.float64) / 32768.0
-    return ww._dbfs(x)
+def db(v):
+    return 20.0 * np.log10(v) if v > 1e-10 else -200.0
 
 
 def load_raw(path):
@@ -62,6 +68,25 @@ def load_raw(path):
     return pcm[:, 0].astype(np.float64) / 2147483648.0     # channel 0, like MicCapture
 
 
+def section_report(name, pre, post):
+    """pre: filtered float blocks (before gain); post: int16 output blocks."""
+    pre_all = np.concatenate(pre)
+    post_all = np.concatenate(post).astype(np.float64)
+    pre_rms = float(np.sqrt(np.mean(pre_all ** 2)))
+    pre_pk = float(np.max(np.abs(pre_all)))
+    post_rms = float(np.sqrt(np.mean(post_all ** 2)))
+    post_pk = float(np.max(np.abs(post_all)))
+    blk_rms = np.array([np.sqrt(np.mean(b.astype(np.float64) ** 2)) for b in post])
+    print(f'  {name:<6} {len(post):3d} blocks | pre-gain  RMS {db(pre_rms):6.1f} dBFS  '
+          f'peak {db(pre_pk):6.1f} dBFS ({pre_pk:.4f})')
+    print(f'  {"":<6}            | post-gain RMS {db(post_rms / 32768):6.1f} dBFS  '
+          f'peak {db(post_pk / 32768):6.1f} dBFS ({post_pk:.0f})')
+    print(f'  {"":<6}            | int16 block RMS: min {blk_rms.min():.0f}  '
+          f'median {np.median(blk_rms):.0f}  p95 {np.percentile(blk_rms, 95):.0f}  '
+          f'max {blk_rms.max():.0f}')
+    return blk_rms
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else '/tmp/speech.wav'
     x = load_raw(path)
@@ -73,40 +98,38 @@ def main():
 
     # 1. Full pipeline, block by block, exactly as MicCapture.read() runs it.
     dsp = ww.MicDSP()
-    outs, in_db, gains = [], [], []
+    pre, post = [], []
     for i in range(n_blocks):
-        out = dsp.process(x[i * ww.HW_BLOCK:(i + 1) * ww.HW_BLOCK])
-        outs.append(out)
-        in_db.append(dsp.in_dbfs)
-        gains.append(dsp.gain_db)
-    bad = [i for i, o in enumerate(outs)
+        y = dsp.filter_decimate(x[i * ww.HW_BLOCK:(i + 1) * ww.HW_BLOCK])
+        pre.append(y)
+        post.append(dsp.apply_gain(y))
+    bad = [i for i, o in enumerate(post)
            if o.dtype != np.int16 or o.shape != (ww.FRAME_LENGTH,)]
     if bad:
         failures.append(f'{len(bad)} blocks not int16 x {ww.FRAME_LENGTH} (first: {bad[0]})')
     print(f'blocks: {n_blocks} x {ww.FRAME_LENGTH} int16 @ {ww.SAMPLE_RATE} Hz '
-          f'({n_blocks * ww.FRAME_LENGTH / ww.SAMPLE_RATE:.2f} s)')
+          f'({n_blocks * ww.FRAME_LENGTH / ww.SAMPLE_RATE:.2f} s), '
+          f'fixed gain {ww.MIC_DSP_GAIN_DB:+g} dB')
 
-    # 2. AGC level over the speech section.
-    in_db = np.array(in_db)
-    out_db = np.array([dbfs_int16(o) for o in outs])
-    speech = in_db >= in_db.max() - SPEECH_WINDOW_DB
-    quiet = ~speech
-    sp_med = float(np.median(out_db[speech]))
-    print(f'pre-gain:  loudest block {in_db.max():6.1f} dBFS, '
-          f'quiet median {np.median(in_db[quiet]) if quiet.any() else float("nan"):6.1f} dBFS '
-          f'(AGC frozen below {ww.AGC_FLOOR_DBFS:g})')
-    print(f'post-AGC:  speech median {sp_med:6.1f} dBFS over {int(speech.sum())} blocks '
-          f'(target {ww.AGC_TARGET_DBFS:g} ± {TOLERANCE_DB:g})')
-    if quiet.any():
-        q_rms = [float(np.sqrt(np.mean(outs[i].astype(np.float64) ** 2)))
-                 for i in np.flatnonzero(quiet)]
-        thr = int(os.environ.get('SILENCE_THRESHOLD', '1400'))
-        print(f'post-AGC:  quiet median {np.median(out_db[quiet]):6.1f} dBFS, '
-              f'max int16 RMS {max(q_rms):.0f} (SILENCE_THRESHOLD {thr}), '
-              f'final gain {gains[-1]:+.1f} dB')
-    if abs(sp_med - ww.AGC_TARGET_DBFS) > TOLERANCE_DB:
-        failures.append(f'speech median {sp_med:.1f} dBFS is outside '
-                        f'{ww.AGC_TARGET_DBFS:g} ± {TOLERANCE_DB:g}')
+    # 2. Noise vs speech levels, before and after the fixed gain.
+    lvl = np.array([ww._dbfs(y) for y in pre])
+    speech = lvl >= lvl.max() - SPEECH_WINDOW_DB
+    noise = (lvl <= np.percentile(lvl, 10) + NOISE_WINDOW_DB) & ~speech
+    if not noise.any() or not speech.any():
+        sys.exit('could not separate noise from speech — record ~2 s of silence, then speak')
+    print(f'sections (pre-gain block level; speech >= {lvl.max() - SPEECH_WINDOW_DB:.1f} dBFS):')
+    n_rms = section_report('noise', [pre[i] for i in np.flatnonzero(noise)],
+                           [post[i] for i in np.flatnonzero(noise)])
+    s_rms = section_report('speech', [pre[i] for i in np.flatnonzero(speech)],
+                           [post[i] for i in np.flatnonzero(speech)])
+
+    thr = int(os.environ.get('SILENCE_THRESHOLD', '1200'))
+    n_hi, s_mid = float(np.percentile(n_rms, 95)), float(np.median(s_rms))
+    print(f'SILENCE_THRESHOLD {thr}: noise p95 {n_hi:.0f} → margin {thr - n_hi:+.0f}; '
+          f'speech median {s_mid:.0f} → margin {s_mid - thr:+.0f}')
+    if not n_hi < thr < s_mid:
+        failures.append(f'SILENCE_THRESHOLD {thr} is not between noise p95 ({n_hi:.0f}) '
+                        f'and speech median ({s_mid:.0f})')
 
     # 3. Filter-state continuity: 3840-sample blocks vs one contiguous array.
     blocked = ww.MicDSP()

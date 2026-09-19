@@ -98,11 +98,17 @@ DECIMATE        = HW_RATE // SAMPLE_RATE           # 3
 HW_BLOCK        = FRAME_LENGTH * DECIMATE          # 3840 frames = 80 ms at 48 kHz
 MIC_HPF_HZ          = float(os.environ.get('MIC_HPF_HZ', '100'))
 MIC_LPF_HZ          = 7200.0                       # anti-alias for the /3 decimation
-AGC_TARGET_DBFS     = float(os.environ.get('MIC_AGC_TARGET_DBFS', '-22'))
-AGC_MAX_GAIN_DB     = float(os.environ.get('MIC_AGC_MAX_GAIN_DB', '30'))
-AGC_FLOOR_DBFS      = float(os.environ.get('MIC_AGC_FLOOR_DBFS', '-50'))
-AGC_ATTACK_S        = 0.05
-AGC_RELEASE_S       = 2.0
+# Fixed gain applied after filtering. Measured at standing distance, the
+# loudest 50 ms of speech is -35.5 dBFS after the HPF; +13 dB puts it at
+# -22.5 dBFS, openWakeWord's trained input level, and the noise floor
+# (-47.1 dBFS) lands at -34.1 dBFS.
+# Deliberately NOT adaptive: SNR is only 11.6 dB, so most blocks are noise and
+# any RMS-tracking AGC ends up tracking (and amplifying) the noise. If distance
+# variation becomes a problem, use a slow peak-tracker bounded to ~[6, 15] dB,
+# not an RMS loop.
+# Distinct from setup-mic.sh's MIC_GAIN_DB, which is the ALSA softvol gain on
+# the "mirror_mic" device — that gain does not apply on the mirror_raw path.
+MIC_DSP_GAIN_DB     = float(os.environ.get('MIC_DSP_GAIN_DB', '13.0'))
 
 # Fallback bundled model when no custom wake-word file is present.
 # Built-ins: hey_jarvis, hey_mycroft, hey_rhasspy, alexa
@@ -193,9 +199,7 @@ class MicDSP:
        false-trigger the wake word.
     2. Decimate by 3 with plain slicing — the LPF above is the anti-alias
        filter (resample_poly per block is stateless and leaves edge artefacts).
-    3. AGC toward AGC_TARGET_DBFS: gain clamped to [0, AGC_MAX_GAIN_DB], one-pole
-       smoothed (fast attack, slow release) and frozen on blocks quieter than
-       AGC_FLOOR_DBFS so silence is never pumped up into the model.
+    3. Fixed gain MIC_DSP_GAIN_DB (see its comment for why it is not adaptive).
     4. Soft-clip at +/-0.99, convert to int16.
     """
 
@@ -205,7 +209,7 @@ class MicDSP:
         lp = butter(8, MIC_LPF_HZ, btype='lowpass', fs=HW_RATE, output='sos')
         self.sos = np.vstack([hp, lp])
         self.zi = np.zeros((self.sos.shape[0], 2))
-        self.gain_db = 0.0
+        self.gain = 10.0 ** (MIC_DSP_GAIN_DB / 20.0)
         self.in_dbfs = -200.0     # pre-gain level of the last block (debug)
 
     def filter_decimate(self, x):
@@ -214,20 +218,15 @@ class MicDSP:
         y, self.zi = sosfilt(self.sos, x, zi=self.zi)
         return y[::DECIMATE]
 
-    def apply_agc(self, y, adapt=True):
-        """16 kHz float block -> int16, updating the AGC gain if adapt."""
+    def apply_gain(self, y):
+        """Filtered 16 kHz float block -> int16 (fixed gain + soft clip)."""
         self.in_dbfs = _dbfs(y)
-        if adapt and self.in_dbfs > AGC_FLOOR_DBFS:
-            desired = min(max(AGC_TARGET_DBFS - self.in_dbfs, 0.0), AGC_MAX_GAIN_DB)
-            tau = AGC_ATTACK_S if desired < self.gain_db else AGC_RELEASE_S
-            alpha = 1.0 - np.exp(-(y.size / SAMPLE_RATE) / tau)
-            self.gain_db += alpha * (desired - self.gain_db)
-        out = y * (10.0 ** (self.gain_db / 20.0))
+        out = y * self.gain
         out = 0.99 * np.tanh(out / 0.99)                   # soft clip at +/-0.99
         return np.round(out * 32767.0).astype(np.int16)
 
-    def process(self, x, adapt=True):
-        return self.apply_agc(self.filter_decimate(x), adapt)
+    def process(self, x):
+        return self.apply_gain(self.filter_decimate(x))
 
 
 class MicCapture:
@@ -239,13 +238,13 @@ class MicCapture:
         self.channels = channels
         self.dsp = MicDSP()
 
-    def read(self, adapt=True):
+    def read(self):
         raw = self.stream.read(HW_BLOCK, exception_on_overflow=False)
         pcm = np.frombuffer(raw, dtype='<i4').reshape(-1, self.channels)
         # Channel 0 only: the INMP441 (L/R -> GND) drives the left slot and the
         # right slot is measured all-zero — summing would only add noise.
         x = pcm[:, 0].astype(np.float64) / 2147483648.0
-        return self.dsp.process(x, adapt)
+        return self.dsp.process(x)
 
     def backlog_blocks(self):
         return self.stream.get_read_available() // HW_BLOCK
@@ -260,8 +259,8 @@ def save_wav(frames, filename):
         wf.writeframes(b''.join(frames))
 
 def record(mic, seconds):
-    # int16 RMS of a post-AGC frame; see SILENCE_THRESHOLD in ecosystem.config.js
-    SILENCE_THRESHOLD = int(os.environ.get('SILENCE_THRESHOLD', '1400'))
+    # int16 RMS of a post-gain frame; see SILENCE_THRESHOLD in ecosystem.config.js
+    SILENCE_THRESHOLD = int(os.environ.get('SILENCE_THRESHOLD', '1200'))
 
     # Everything below is TIME-based so it stays correct no matter what
     # FRAME_LENGTH is. (This is what broke: the old code counted frames, so
@@ -320,8 +319,7 @@ def drain_stream(mic):
     wake-word feature buffer, not PortAudio's, so both are needed.
 
     The backlog still goes through mic.read() so the filter state stays
-    continuous, but with the AGC frozen: it is stale audio (mostly our own
-    reply) and must not drag the gain away from the user's voice level.
+    continuous.
     """
     try:
         dropped = 0
@@ -329,7 +327,7 @@ def drain_stream(mic):
         while dropped < limit:
             if mic.backlog_blocks() < 1:
                 break
-            mic.read(adapt=False)
+            mic.read()
             dropped += FRAME_LENGTH
         if dropped:
             log(f'Flushed {dropped / SAMPLE_RATE:.1f}s of buffered audio')
@@ -346,13 +344,12 @@ def settle(mic, model, seconds=None):
     the mirror ends up answering itself in a loop. So read and throw away audio
     for a short refractory window, then reset the detector so it restarts from a
     clean feature buffer rather than one primed with our own voice.
-    AGC is frozen here for the same reason as in drain_stream().
     """
     seconds = COOLDOWN_SECONDS if seconds is None else seconds
     deadline = time.time() + seconds
     try:
         while time.time() < deadline:
-            mic.read(adapt=False)
+            mic.read()
     except Exception as e:
         log(f'settle interrupted: {e}')
     model.reset()
@@ -484,8 +481,7 @@ def main():
         stream, channels = open_stream(None)
     mic = MicCapture(stream, channels)
     log(f'Microphone: {mic_desc} — {HW_RATE} Hz S32 x{channels}, '
-        f'HPF {MIC_HPF_HZ:g} Hz, AGC {AGC_TARGET_DBFS:g} dBFS '
-        f'(max +{AGC_MAX_GAIN_DB:g} dB, frozen below {AGC_FLOOR_DBFS:g} dBFS)')
+        f'HPF {MIC_HPF_HZ:g} Hz, fixed gain {MIC_DSP_GAIN_DB:+g} dB')
 
     log(f'Say "{wake_word_name}" to activate the mirror '
         f'(model="{target_key}", threshold={DETECT_THRESHOLD})')
@@ -508,10 +504,10 @@ def main():
                 _dbg_peak_in = max(_dbg_peak_in, mic.dsp.in_dbfs)
                 _dbg_peak_score = max(_dbg_peak_score, score)
                 if _dbg_frames >= 25:  # ~2s @ 80ms/frame
-                    # out_peak = post-AGC int16 peak, gain = AGC gain now,
-                    # in = loudest pre-gain block (compare with MIC_AGC_FLOOR_DBFS)
-                    log(f'[debug] out_peak={_dbg_peak_amp:5d}  gain={mic.dsp.gain_db:+5.1f} dB'
-                        f'  in={_dbg_peak_in:6.1f} dBFS  wake_score={_dbg_peak_score:.2f}'
+                    # out_peak = post-gain int16 peak, in = loudest pre-gain
+                    # block RMS (gain is fixed at MIC_DSP_GAIN_DB, so not shown)
+                    log(f'[debug] out_peak={_dbg_peak_amp:5d}  in={_dbg_peak_in:6.1f} dBFS'
+                        f'  wake_score={_dbg_peak_score:.2f}'
                         f'  (need >= {DETECT_THRESHOLD})')
                     _dbg_frames = 0
                     _dbg_peak_amp = 0

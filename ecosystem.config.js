@@ -48,12 +48,13 @@ module.exports = {
 
         // Microphone: the INMP441 I2S mic opened RAW as the ALSA device
         // "mirror_raw" (scripts/setup-mic.sh). wakeword.py filters (100 Hz HPF),
-        // decimates to 16 kHz and applies AGC itself — gain after filtering, so
-        // the mic's low-frequency rumble can't clip. If the device is missing,
+        // decimates to 16 kHz and applies a fixed gain itself — gain after
+        // filtering, so the mic's low-frequency rumble can't clip. If the device is missing,
         // the loop logs a warning and uses the default input.
         MIC_DEVICE:       'mirror_raw',
-        // Mic DSP (defaults shown): MIC_HPF_HZ '100', MIC_AGC_TARGET_DBFS '-22',
-        // MIC_AGC_MAX_GAIN_DB '30', MIC_AGC_FLOOR_DBFS '-50'
+        // Mic DSP (defaults shown): MIC_HPF_HZ '100', MIC_DSP_GAIN_DB '13.0'
+        // (fixed, not adaptive — see wakeword.py; MIC_GAIN_DB is only the ALSA
+        // softvol on mirror_mic and does not apply to mirror_raw)
         // WAKE_DENOISE:   '1',      // Speex NS; needs speexdsp-ns (optional)
 
         // Wake word. WAKE_MODEL picks a bundled openWakeWord model
@@ -71,10 +72,11 @@ module.exports = {
         // Recording / endpointing
         RECORD_SECONDS:     '8',
         SILENCE_SECONDS:    '0.7',
-        // int16 RMS of the post-AGC signal. AGC holds speech near -22 dBFS
-        // (~2600) and the noise floor sits near -33 dBFS (~680); 1400 splits
-        // them. The old 500 was tuned on the unfiltered, clipping ALSA chain.
-        SILENCE_THRESHOLD:  '1400',
+        // int16 RMS of the post-gain signal. At MIC_DSP_GAIN_DB=13, noise RMS
+        // is ~646 and speech RMS ~2460; 1200 sits between them with margin.
+        // 1400 risks cutting off the quiet tail of a word during endpointing.
+        // The old 500 was tuned on the unfiltered, clipping ALSA chain.
+        SILENCE_THRESHOLD:  '1200',
         PRESPEECH_TIMEOUT:  '3.0'
       }
     },
